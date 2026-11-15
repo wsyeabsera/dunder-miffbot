@@ -80,3 +80,28 @@ test("someone given work walks back to their desk and sits there", () => {
   }
   assert.ok(a.spot === a.seat && isSeated(a), "back at the desk");
 });
+
+test("people go round each other: overlaps are rare and nobody gets stuck on a walk", () => {
+  for (const seed of [1, 2, 3]) {
+    const w = makeWorld(seed);
+    for (const a of w.entities) a.stay = 0.1 + Math.random() * 0; // everyone starts a break at once, so the halls are busy
+    let close = 0;
+    let longest = 0;
+    const walking = new Map<Entity, number>();
+    for (let t = 0; t < 6000; t++) {
+      step(w, 0.1);
+      for (let i = 0; i < w.entities.length; i++) {
+        const a = w.entities[i];
+        walking.set(a, a.walking ? (walking.get(a) ?? 0) + 0.1 : 0);
+        longest = Math.max(longest, walking.get(a)!);
+        for (let j = i + 1; j < w.entities.length; j++) {
+          const b = w.entities[j];
+          if (!isSeated(a) && !isSeated(b) && Math.hypot(a.x - b.x, a.z - b.z) < 0.35) close++;
+        }
+      }
+    }
+    // Before steering round people this was 700 to 1700 per run
+    assert.ok(close < 250, `seed ${seed}: ${close} steps with two people closer than 0.35 m`);
+    assert.ok(longest < 90, `seed ${seed}: someone walked for ${longest.toFixed(0)} s`);
+  }
+});

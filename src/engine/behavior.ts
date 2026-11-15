@@ -37,6 +37,8 @@ export function goTo(world: World, a: Entity, to: Spot) {
   if (world.holder.get(a.spot.id) === a && a.spot !== a.seat) world.holder.delete(a.spot.id);
   world.holder.set(to.id, a);
   a.path = route(world, a, to);
+  a.best = Infinity;
+  a.stuck = 0;
   a.spot = to;
   a.walking = a.path.length > 0;
 }

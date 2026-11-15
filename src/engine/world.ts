@@ -22,6 +22,10 @@ export type Entity = {
   phase: number;
   /** Picks between similar animation clips so neighbours do not move in sync. */
   variant: number;
+  /** Seconds without getting closer to the next waypoint (boxed in or nudged back and forth); past a point they skip to it. */
+  stuck: number;
+  /** Closest they have been to the next waypoint so far. */
+  best: number;
 };
 
 export type World = {
@@ -45,7 +49,7 @@ export function assignSeats(level: Level, people: { post?: string }[]): Spot[] {
 /** A person sitting at their seat, with the staggered timers that keep a whole office from standing up at once. */
 export function spawn(e: Employee, seat: Spot, index: number, rng: () => number): Entity {
   const between = (a: number, b: number) => a + rng() * (b - a);
-  return { e, seat, spot: seat, path: [], walking: false, stay: between(1, 14), x: seat.x, z: seat.z, heading: seat.face, speed: between(1.25, 1.75), phase: index * 1.7, variant: index };
+  return { e, seat, spot: seat, path: [], walking: false, stay: between(1, 14), x: seat.x, z: seat.z, heading: seat.face, speed: between(1.25, 1.75), phase: index * 1.7, variant: index, stuck: 0, best: Infinity };
 }
 
 /** The world around some entities (which may carry extra fields, such as their 3D body). */
