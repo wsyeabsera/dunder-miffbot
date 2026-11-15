@@ -18,7 +18,8 @@ const BREAKS: { activity: Activity; weight: number; stay: [number, number] }[] =
   { activity: "couch", weight: 2, stay: [12, 24] },
   { activity: "terrace", weight: 1.5, stay: [10, 20] },
   { activity: "library", weight: 1, stay: [6, 12] },
-  { activity: "wander", weight: 1.5, stay: [4, 8] },
+  { activity: "wander", weight: 1, stay: [4, 8] },
+  { activity: "chat", weight: 2.5, stay: [9, 15] },
 ];
 /** How far to raise a seated person so they sit on the seat: the sitting clip is made for a low seat. Tuned by eye. */
 const SIT_LIFT = { chair: 0.2, soft: 0.0 };
@@ -218,8 +219,18 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     let r = Math.random() * total;
     for (const o of options) {
       if ((r -= o.weight) <= 0) {
-        goTo(a, o.free[Math.floor(Math.random() * o.free.length)]);
+        const spot = o.free[Math.floor(Math.random() * o.free.length)];
+        goTo(a, spot);
         a.stay = rand(o.stay[0], o.stay[1]);
+        // A chat needs two: call over someone on a break to stand opposite
+        const partner = spot.partner ? level.spots.find((s) => s.id === spot.partner) : undefined;
+        if (partner && !holder.has(partner.id)) {
+          const mate = agents.find((b) => b !== a && b.e.status === "idle" && !b.walking && b.stay > 0 && !b.spot.partner);
+          if (mate) {
+            goTo(mate, partner);
+            mate.stay = a.stay;
+          }
+        }
         return;
       }
     }
@@ -304,12 +315,17 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     if (p === "sip") return "Consume";
     if (p === "sit") return SIT[a.variant % 2];
     if (p === "sitSoft") return a.variant % 2 ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop";
-    if (a.spot.activity === "wander" && a.variant % 2 === 0) return "Idle_TalkingPhone_Loop";
-    return STAND[a.variant % STAND.length];
+    switch (a.spot.activity) {
+      case "chat": return "Idle_Talking_Loop";
+      case "print": return "Interact";
+      case "wander": return ["Idle_TalkingPhone_Loop", "Idle_FoldArms_Loop", "Idle_No_Loop", "Idle_Loop"][a.variant % 4];
+      case "library": return "Idle_FoldArms_Loop";
+      default: return STAND[a.variant % STAND.length];
+    }
   }
 
   const DOING: Record<string, string> = {
-    coffee: "Getting coffee", lunch: "Having lunch", print: "At the printer", restroom: "Back in a minute", couch: "Watching TV", terrace: "Getting some air", library: "Browsing books", wander: "Stretching legs", desk: "At the desk",
+    coffee: "Getting coffee", lunch: "Having lunch", print: "At the printer", restroom: "Back in a minute", couch: "Watching TV", terrace: "Getting some air", library: "Browsing books", wander: "Stretching legs", chat: "Having a chat", desk: "At the desk",
   };
   /** One line about what someone is doing, for their bubble. */
   function describe(a: Agent): string {
@@ -332,6 +348,9 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       a.actor.play(clip, 0.3);
     }
     a.actor.update(dt * (a.walking ? Math.max(0.6, a.speed / 1.5) : 1));
+    // At the desk: type while working, slump while resting
+    const atDesk = !a.walking && a.spot.pose === "desk";
+    a.actor.overlay(atDesk && a.e.status === "working" ? "typing" : atDesk && a.e.status === "resting" ? "sleeping" : "none", performance.now() / 1000, a.phase);
 
     const resting = a.e.status === "resting" && a.spot.pose === "desk" && !a.walking;
     (a.marker.material as THREE.MeshBasicMaterial).color.set(STATUS_COLOR[a.e.status]);
@@ -446,6 +465,8 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       a.marker.visible = rig.mode === "iso" || (rig.mode === "follow" && a === focus);
       a.name.visible = !inPov && (a.e.id === selected || a.e.id === hovered || (first && a.e.id === looked));
       if (a.name.visible) {
+        const k = rig.labelScale(rig.camera.position.distanceTo(a.actor.group.position));
+        a.name.scale.set(2.3 * k, 0.67 * k, 1);
         const text = describe(a);
         if (text !== a.bubble) {
           a.bubble = text;

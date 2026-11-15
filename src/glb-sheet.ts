@@ -44,10 +44,20 @@ const actors = employees.slice(0, n).map((e, i) => {
   scene.add(a.group);
   return a;
 });
+// ?bone=lowerarm_r&axis=x&deg=60 bends a bone after the animation, to find out which axis does what
+const boneName = params.get("bone");
+const axis = (params.get("axis") ?? "x") as "x" | "y" | "z";
+const rad = (Number(params.get("deg") ?? 0) * Math.PI) / 180;
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = clock.getDelta();
-  for (const a of actors) a.update(dt);
+  for (const a of actors) {
+    a.update(dt);
+    const overlay = params.get("overlay");
+    if (overlay) a.overlay(overlay as "typing" | "sleeping", clock.elapsedTime, 0);
+    const bone = boneName ? a.group.getObjectByName(boneName) : null;
+    if (bone) (axis === "x" ? bone.rotateX : axis === "y" ? bone.rotateY : bone.rotateZ).call(bone, rad);
+  }
   renderer.render(scene, cam);
 });
 (window as unknown as { __ready: boolean }).__ready = true;

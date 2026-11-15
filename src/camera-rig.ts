@@ -211,6 +211,12 @@ export class CameraRig {
     }
   }
 
+  /** A size factor for things drawn over the scene (bubbles): constant on screen whatever the zoom or distance. 1 is about 2.3 units wide. */
+  labelScale(distance: number): number {
+    const k = this.mode === "iso" ? this.viewH / 50 : distance / 9;
+    return Math.min(2, Math.max(0.3, k));
+  }
+
   /** Where the walking boss stands (feet), for the minimap. */
   walkPosition() {
     return this.hooks.walker.position();

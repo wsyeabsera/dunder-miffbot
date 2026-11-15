@@ -18,10 +18,10 @@ export type PropKind =
 export type Quarter = 0 | 1 | 2 | 3;
 export type Prop = { kind: PropKind; x: number; z: number; rot?: Quarter; w?: number; d?: number; text?: string; sub?: string; color?: string; border?: string };
 
-export type Activity = "desk" | "coffee" | "lunch" | "print" | "restroom" | "couch" | "terrace" | "library" | "wander";
+export type Activity = "desk" | "coffee" | "lunch" | "print" | "restroom" | "couch" | "terrace" | "library" | "wander" | "chat";
 export type Pose = "desk" | "stand" | "sip" | "sit" | "sitSoft";
 /** A place one person uses at a time. `approach` is where the walk ends before stepping to the spot itself. */
-export type Spot = { id: string; activity: Activity; x: number; z: number; face: number; pose: Pose; approach: Pt; room: string; reception?: boolean };
+export type Spot = { id: string; activity: Activity; x: number; z: number; face: number; pose: Pose; approach: Pt; room: string; reception?: boolean; /** The spot facing this one, for two people talking. */ partner?: string };
 
 export type Level = { rooms: Room[]; props: Prop[]; spots: Spot[]; seats: Spot[]; walls: Grid; grid: Grid };
 
@@ -107,7 +107,15 @@ export function buildLevel(): Level {
   add({ kind: "cabinet", x: x0 + 1, z: 7.2 - 1.2 });
   add({ kind: "rug", x: 10, z: 0, w: 9, d: 6, color: "#2f5d62", border: "#e8e2d0" });
   for (const [px, pz] of [[7, -6], [13, -6], [7, 6], [13, 6]] as const) add({ kind: "plant-tall", x: px, z: pz });
-  for (const [wx, wz] of [[8.5, -3.5], [11.5, -3.5], [8.5, 3.5], [11.5, 3.5], [10, 0]] as const) spot("wander", "hall", wx, wz, Math.PI / 2, "stand");
+  // Standing spots in the town square: two people can meet at a pair of chat spots, facing each other
+  spot("wander", "hall", 12, 4.5, Math.PI / 2, "stand");
+  spot("wander", "hall", 12, -4.5, Math.PI / 2, "stand");
+  for (const [cx, cz] of [[8.4, -3.5], [8.4, 3.5], [11.6, -0.5]] as const) {
+    const a = spot("chat", "hall", cx, cz, Math.PI / 2, "stand");
+    const b = spot("chat", "hall", cx + 1.5, cz, -Math.PI / 2, "stand");
+    a.partner = b.id;
+    b.partner = a.id;
+  }
 
   // ---- Kitchen
   add({ kind: "window", x: -25, z: z0 + CELL });

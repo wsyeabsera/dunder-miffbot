@@ -126,6 +126,8 @@ export type Actor = {
   head: THREE.Bone;
   mixer: THREE.AnimationMixer;
   look: ActorLook;
+  /** Bend bones on top of the playing clip (call after `update`): typing at a keyboard, or slumped asleep. */
+  overlay(kind: "none" | "typing" | "sleeping", time: number, phase: number): void;
   /** Cross-fade to a clip by name. */
   play(name: string, fade?: number): void;
   update(dt: number): void;
@@ -212,6 +214,17 @@ export function createActor(kit: Kit, look: ActorLook): Actor {
     },
     update(dt) {
       mixer.update(dt);
+    },
+    overlay(kind, time, phase) {
+      // Found by bending each bone on the dev sheet: rotating about local X flexes the elbow and nods the neck.
+      if (kind === "typing") {
+        bones["lowerarm_l"]?.rotateX(0.75 + Math.sin(time * 13 + phase) * 0.09);
+        bones["lowerarm_r"]?.rotateX(0.75 + Math.sin(time * 13 + phase + 2.1) * 0.09);
+        bones["neck_01"]?.rotateX(0.2 + Math.sin(time * 1.3 + phase) * 0.03);
+      } else if (kind === "sleeping") {
+        bones["neck_01"]?.rotateX(0.7);
+        bones["spine_03"]?.rotateX(0.18);
+      }
     },
   };
 }
