@@ -14,6 +14,7 @@ Measured 2026-11-15 on one laptop (Apple Silicon, Chrome, 120 Hz display), dev s
 ## What keeps it fast
 
 - Static props merged per 24-unit chunk and material; characters' rigid parts merged per bone (about 20 draw calls each instead of 45).
+- People outside the camera's view are hidden and not animated (their time is caught up when they come back); the shadow light only covers what the camera sees.
 - Click tests use one invisible box per person, never the skinned meshes.
 - Pathfinding is cheap: 0.8 ms per path (4 far-apart routes, 40 runs), so it is not the source of spikes.
 - Rapier (4 MB of WebAssembly) loads only the first time someone walks. three.js is its own cached chunk; our own code is about 52 KB.

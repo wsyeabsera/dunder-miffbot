@@ -25,6 +25,10 @@ type Agent = Entity & {
   name: THREE.Sprite;
   clip: string;
   bubble: string;
+  /** In (or near) the camera's view; people outside it are neither animated nor drawn. */
+  inView: boolean;
+  /** Time not yet animated while out of view, applied when they come back. */
+  lag: number;
 };
 
 export type Office = {
@@ -186,7 +190,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     g.rotation.y = seat.face;
     g.name = e.name;
     people.add(g);
-    return { ...spawn(e, seat, i, Math.random), actor, sit: 1, lift: SIT_LIFT.chair, marker, zzz, name, clip: "", bubble: "" } satisfies Agent;
+    return { ...spawn(e, seat, i, Math.random), actor, sit: 1, lift: SIT_LIFT.chair, marker, zzz, name, clip: "", bubble: "", inView: true, lag: 0 } satisfies Agent;
   });
 
   // ---- The simulation: behaviour and movement are pure systems in src/engine; this file only draws the result.
@@ -250,10 +254,15 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       a.clip = clip;
       a.actor.play(clip, 0.3);
     }
-    a.actor.update(dt * (a.walking ? Math.max(0.6, a.speed / 1.5) : 1));
-    // At the desk: type while working, slump while resting
-    const atDesk = !a.walking && a.spot.pose === "desk";
-    a.actor.overlay(atDesk && a.e.status === "working" ? "typing" : atDesk && a.e.status === "resting" ? "sleeping" : "none", performance.now() / 1000, a.phase);
+    if (a.inView) {
+      a.actor.update((dt + a.lag) * (a.walking ? Math.max(0.6, a.speed / 1.5) : 1));
+      a.lag = 0;
+      // At the desk: type while working, slump while resting
+      const atDesk = !a.walking && a.spot.pose === "desk";
+      a.actor.overlay(atDesk && a.e.status === "working" ? "typing" : atDesk && a.e.status === "resting" ? "sleeping" : "none", performance.now() / 1000, a.phase);
+    } else {
+      a.lag = Math.min(a.lag + dt, 2);
+    }
 
     const resting = a.e.status === "resting" && a.spot.pose === "desk" && !a.walking;
     (a.marker.material as THREE.MeshBasicMaterial).color.set(STATUS_COLOR[a.e.status]);
@@ -353,6 +362,9 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   resize();
 
   const eye = new THREE.Vector3();
+  const viewFrustum = new THREE.Frustum();
+  const viewMatrix = new THREE.Matrix4();
+  const personSphere = new THREE.Sphere(new THREE.Vector3(), 3.5); // generous, so shadows and swinging arms never pop
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.1);
@@ -394,6 +406,16 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       subject.turn = 0;
     }
     rig.update(dt, focus ? subject : null);
+    // Who is in view: out-of-view people are hidden and not animated, which is most of them when zoomed in
+    rig.camera.updateMatrixWorld();
+    viewMatrix.multiplyMatrices(rig.camera.projectionMatrix, rig.camera.matrixWorldInverse);
+    viewFrustum.setFromProjectionMatrix(viewMatrix);
+    for (const a of agents) {
+      personSphere.center.set(a.x, 1, a.z);
+      a.inView = viewFrustum.intersectsSphere(personSphere);
+      a.actor.group.visible = a.inView;
+    }
+
     const look = rig.shadowFocus(focus ? { x: subject.position.x, z: subject.position.z } : null);
     updateShadow(look.x, look.z, look.half);
 
