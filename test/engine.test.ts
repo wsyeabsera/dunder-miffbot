@@ -46,6 +46,7 @@ test("five minutes of office life: nobody walks into a wall, spots are never dou
   const w = makeWorld(42);
   const activities = new Set<string>();
   let pairs = 0;
+  let meetings = 0;
   for (let t = 0; t < 3000; t++) {
     step(w, 0.1);
     for (const a of w.entities) {
@@ -57,9 +58,12 @@ test("five minutes of office life: nobody walks into a wall, spots are never dou
     // Two people on the two ends of a chat pair at once
     const chatting = w.entities.filter((a) => !a.walking && a.spot.activity === "chat" && a.spot.partner && w.holder.get(a.spot.partner) && !w.holder.get(a.spot.partner)!.walking);
     if (chatting.length >= 2) pairs++;
+    // Three or more people seated in one meeting room
+    for (const room of ["meetA", "meetB"]) if (w.entities.filter((a) => !a.walking && a.spot.activity === "meeting" && a.spot.room === room).length >= 3) meetings++;
   }
   assert.ok(activities.size >= 6, `varied breaks, saw ${[...activities].join(", ")}`);
   assert.ok(pairs > 0, "at least once two people stood facing each other to chat");
+  assert.ok(meetings > 0, "at least once three or more people sat down in a meeting room together");
 });
 
 test("someone given work walks back to their desk and sits there", () => {

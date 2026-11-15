@@ -18,7 +18,7 @@ export type PropKind =
 export type Quarter = 0 | 1 | 2 | 3;
 export type Prop = { kind: PropKind; x: number; z: number; rot?: Quarter; w?: number; d?: number; text?: string; sub?: string; color?: string; border?: string };
 
-export type Activity = "desk" | "coffee" | "lunch" | "print" | "restroom" | "couch" | "terrace" | "library" | "wander" | "chat";
+export type Activity = "desk" | "coffee" | "lunch" | "print" | "restroom" | "couch" | "terrace" | "library" | "wander" | "chat" | "meeting";
 export type Pose = "desk" | "stand" | "sip" | "sit" | "sitSoft";
 /** A place one person uses at a time. `approach` is where the walk ends before stepping to the spot itself. */
 export type Spot = { id: string; activity: Activity; x: number; z: number; face: number; pose: Pose; approach: Pt; room: string; reception?: boolean; /** The spot facing this one, for two people talking. */ partner?: string };
@@ -135,11 +135,11 @@ export function buildLevel(): Level {
   }
 
   // ---- Meeting rooms (furnished for later meetings)
-  for (const cx of [-11, -1]) {
+  for (const [room, cx] of [["meetA", -11], ["meetB", -1]] as const) {
     add({ kind: "table", x: cx, z: -14, w: 4.8, d: 1.7 });
     for (const dx of [-1.5, -0.5, 0.5, 1.5]) {
-      add({ kind: "chair", x: cx + dx, z: -14 - 1.3, rot: 0 });
-      add({ kind: "chair", x: cx + dx, z: -14 + 1.3, rot: 2 });
+      chairSpot("meeting", room, cx + dx, -14 - 1.3, 0, "sit");
+      chairSpot("meeting", room, cx + dx, -14 + 1.3, Math.PI, "sit");
     }
     add({ kind: "whiteboard", x: cx, z: z0 + CELL });
     add({ kind: "plant-fern", x: cx - 4, z: -9.2 });

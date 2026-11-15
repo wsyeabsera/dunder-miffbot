@@ -15,6 +15,7 @@ export const BREAKS: { activity: Activity; weight: number; stay: [number, number
   { activity: "library", weight: 1, stay: [6, 12] },
   { activity: "wander", weight: 1, stay: [4, 8] },
   { activity: "chat", weight: 2.5, stay: [9, 15] },
+  { activity: "meeting", weight: 1.2, stay: [14, 22] },
 ];
 
 /** The walk from where someone is to a spot: out of their chair first if seated, then the route, then the last step onto the spot. */
@@ -57,6 +58,15 @@ export function pickBreak(world: World, a: Entity) {
         if (mate) {
           goTo(world, mate, partner);
           mate.stay = a.stay;
+        }
+      }
+      // A meeting needs a group: call over up to three others on a break to take seats at the same table
+      if (spot.activity === "meeting") {
+        const seats = level.spots.filter((s) => s.activity === "meeting" && s.room === spot.room && !holder.has(s.id));
+        const others = world.entities.filter((b) => b !== a && b.e.status === "idle" && !b.walking && b.stay > 0 && b.spot.activity !== "meeting");
+        for (let k = 0; k < Math.min(3, seats.length, others.length); k++) {
+          goTo(world, others[k], seats[k]);
+          others[k].stay = a.stay;
         }
       }
       return;

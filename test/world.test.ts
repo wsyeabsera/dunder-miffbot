@@ -24,7 +24,7 @@ const HUB = { x: 8, z: -5 }; // the town square
 test("the level has what the activity system needs", () => {
   assert.ok(level.seats.length >= 30, `desks for 30 employees, got ${level.seats.length}`);
   assert.equal(level.seats.filter((s) => s.reception).length, 1);
-  for (const a of ["coffee", "lunch", "print", "restroom", "couch", "terrace", "library", "wander", "chat"] as const) {
+  for (const a of ["coffee", "lunch", "print", "restroom", "couch", "terrace", "library", "wander", "chat", "meeting"] as const) {
     assert.ok(level.spots.some((s) => s.activity === a), `has ${a} spots`);
   }
 });

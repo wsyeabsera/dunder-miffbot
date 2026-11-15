@@ -197,7 +197,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   }
 
   const DOING: Record<string, string> = {
-    coffee: "Getting coffee", lunch: "Having lunch", print: "At the printer", restroom: "Back in a minute", couch: "Watching TV", terrace: "Getting some air", library: "Browsing books", wander: "Stretching legs", chat: "Having a chat", desk: "At the desk",
+    coffee: "Getting coffee", lunch: "Having lunch", print: "At the printer", restroom: "Back in a minute", couch: "Watching TV", terrace: "Getting some air", library: "Browsing books", wander: "Stretching legs", chat: "Having a chat", meeting: "In a meeting", desk: "At the desk",
   };
   /** One line about what someone is doing, for their bubble. */
   function describe(a: Agent): string {
