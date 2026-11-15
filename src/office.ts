@@ -198,6 +198,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     if (p === "sitSoft") return a.variant % 2 ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop";
     switch (a.spot.activity) {
       case "chat": return "Idle_Talking_Loop";
+      case "play": return "Interact";
       case "print": return "Interact";
       case "wander": return ["Idle_TalkingPhone_Loop", "Idle_FoldArms_Loop", "Idle_No_Loop", "Idle_Loop"][a.variant % 4];
       case "library": return "Idle_FoldArms_Loop";
@@ -206,7 +207,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   }
 
   const DOING: Record<string, string> = {
-    coffee: "Getting coffee", lunch: "Having lunch", print: "At the printer", restroom: "Back in a minute", couch: "Watching TV", terrace: "Getting some air", library: "Browsing books", wander: "Stretching legs", chat: "Having a chat", meeting: "In a meeting", desk: "At the desk",
+    coffee: "Getting coffee", lunch: "Having lunch", print: "At the printer", restroom: "Back in a minute", couch: "Watching TV", terrace: "Getting some air", library: "Browsing books", wander: "Stretching legs", chat: "Having a chat", meeting: "In a meeting", play: "Playing ping-pong", desk: "At the desk",
   };
   /** One line about what someone is doing, for their bubble. */
   function describe(a: Agent): string {

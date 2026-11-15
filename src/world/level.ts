@@ -18,7 +18,7 @@ export type PropKind =
 export type Quarter = 0 | 1 | 2 | 3;
 export type Prop = { kind: PropKind; x: number; z: number; rot?: Quarter; w?: number; d?: number; text?: string; sub?: string; color?: string; border?: string };
 
-export type Activity = "desk" | "coffee" | "lunch" | "print" | "restroom" | "couch" | "terrace" | "library" | "wander" | "chat" | "meeting";
+export type Activity = "desk" | "coffee" | "lunch" | "print" | "restroom" | "couch" | "terrace" | "library" | "wander" | "chat" | "meeting" | "play";
 export type Pose = "desk" | "stand" | "sip" | "sit" | "sitSoft";
 /** A place one person uses at a time. `approach` is where the walk ends before stepping to the spot itself. */
 export type Spot = { id: string; activity: Activity; x: number; z: number; face: number; pose: Pose; approach: Pt; room: string; reception?: boolean; /** The spot facing this one, for two people talking. */ partner?: string };
@@ -178,6 +178,10 @@ export function buildLevel(): Level {
     for (const dx of [-0.85, 0, 0.85]) spot("couch", "lounge", cx + dx, 1.6, Math.PI, "sitSoft", { x: cx + dx, z: 1.6 - 1.4 });
   }
   add({ kind: "pingpong", x: 26, z: 5.2, rot: 0 });
+  const west = spot("play", "lounge", 23.9, 5.2, Math.PI / 2, "stand");
+  const east = spot("play", "lounge", 28.1, 5.2, -Math.PI / 2, "stand");
+  west.partner = east.id;
+  east.partner = west.id;
   add({ kind: "rug", x: 23, z: 0, w: 11, d: 5.4, color: "#4a3a5a", border: "#e8b04a" });
   add({ kind: "lamp", x: 17.3, z: -2.8 });
   add({ kind: "plant-tall", x: 29.2, z: -2.8 });

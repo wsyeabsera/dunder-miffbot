@@ -16,6 +16,7 @@ export const BREAKS: { activity: Activity; weight: number; stay: [number, number
   { activity: "wander", weight: 1, stay: [4, 8] },
   { activity: "chat", weight: 2.5, stay: [9, 15] },
   { activity: "meeting", weight: 1.2, stay: [14, 22] },
+  { activity: "play", weight: 1.5, stay: [10, 18] },
 ];
 
 /** The walk from where someone is to a spot: out of their chair first if seated, then the route, then the last step onto the spot. */
