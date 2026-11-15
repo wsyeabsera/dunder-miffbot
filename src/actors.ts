@@ -17,6 +17,7 @@ export type ActorLook = {
   hair: HairName;
   hairColor: string;
   beard: boolean;
+  glasses: boolean;
   shirt: string;
   pants: string;
   shoes: string;
@@ -32,10 +33,17 @@ export type Kit = {
   clips: Map<string, THREE.AnimationClip>;
 };
 
-type Region = { bones: RegExp; offset: number; /** Height range as a fraction of the body, for a straight hem. */ y: [number, number] };
+type Region = {
+  bones: RegExp;
+  offset: number;
+  /** Height range as a fraction of the body, for a straight hem. */
+  y: [number, number];
+  /** Parts of the garment that hang looser (the body of a shirt, the thighs of trousers), and by how much more. */
+  loose?: { bones: RegExp; extra: number };
+};
 const REGIONS: Record<keyof Shells, Region> = {
-  shirt: { bones: /^(spine_0[1-3]|clavicle_|upperarm_|pelvis)/i, offset: 0.017, y: [0.5, 1] },
-  pants: { bones: /^(pelvis|thigh_|calf_)/i, offset: 0.021, y: [0.04, 0.62] },
+  shirt: { bones: /^(spine_0[1-3]|clavicle_|upperarm_|pelvis)/i, offset: 0.012, y: [0.5, 1], loose: { bones: /^(spine_0[1-3]|pelvis)/i, extra: 1.5 } },
+  pants: { bones: /^(pelvis|thigh_|calf_)/i, offset: 0.018, y: [0.04, 0.62], loose: { bones: /^(pelvis|thigh_)/i, extra: 0.9 } },
   shoes: { bones: /^(foot_|ball_)/i, offset: 0.028, y: [0, 0.075] },
 };
 
@@ -75,10 +83,15 @@ function shell(body: THREE.SkinnedMesh, region: Region, scale: number): THREE.Bu
   }
   const out = new THREE.BufferGeometry();
   const moved = new Float32Array(pos.count * 3);
+  const loose = region.loose ? bones.map((b) => region.loose!.bones.test(b.name)) : null;
   for (let v = 0; v < pos.count; v++) {
-    moved[v * 3] = pos.getX(v) + nor.getX(v) * region.offset * scale;
-    moved[v * 3 + 1] = pos.getY(v) + nor.getY(v) * region.offset * scale;
-    moved[v * 3 + 2] = pos.getZ(v) + nor.getZ(v) * region.offset * scale;
+    // Hang looser where the garment is loose: scale the push-out by how much of this vertex follows a loose bone
+    let lw = 0;
+    if (loose) for (let k = 0; k < 4; k++) if (loose[si.getComponent(v, k)]) lw += sw.getComponent(v, k);
+    const push = region.offset * scale * (1 + (region.loose?.extra ?? 0) * Math.min(1, lw));
+    moved[v * 3] = pos.getX(v) + nor.getX(v) * push;
+    moved[v * 3 + 1] = pos.getY(v) + nor.getY(v) * push;
+    moved[v * 3 + 2] = pos.getZ(v) + nor.getZ(v) * push;
   }
   out.setAttribute("position", new THREE.BufferAttribute(moved, 3));
   out.setAttribute("normal", nor);
@@ -118,6 +131,31 @@ export async function loadKit(): Promise<Kit> {
   hairNames.forEach((n, i) => hairs.set(n, hairFiles[i].scene));
 
   return { bases: { male: prepare(male, lightMale), female: prepare(female, lightFemale) }, hairs, clips };
+}
+
+/** Round glasses, built in the character's rest pose in front of the eyes and then fixed to the head bone. */
+function makeGlasses(head: THREE.Bone): THREE.Group {
+  const eyes = new THREE.Vector3();
+  head.getWorldPosition(eyes);
+  eyes.add(new THREE.Vector3(0, 0.082, 0.1)); // between the eyes, a hair in front of the face
+  const frame = new THREE.MeshStandardMaterial({ color: "#1b1b24", roughness: 0.35, metalness: 0.3 });
+  const g = new THREE.Group();
+  for (const x of [-0.034, 0.034]) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.027, 0.0035, 8, 24), frame);
+    ring.position.set(x, 0, 0);
+    g.add(ring);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.0265, 20), new THREE.MeshStandardMaterial({ color: "#cfe6ff", transparent: true, opacity: 0.12, roughness: 0.05 }));
+    lens.position.set(x, 0, 0);
+    g.add(lens);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.003, 0.085), frame);
+    arm.position.set(x * 2.05, 0, -0.04);
+    g.add(arm);
+  }
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.004, 0.004), frame));
+  g.position.copy(eyes);
+  g.updateMatrixWorld(true);
+  g.applyMatrix4(head.matrixWorld.clone().invert());
+  return g;
 }
 
 export type Actor = {
@@ -174,6 +212,8 @@ export function createActor(kit: Kit, look: ActorLook): Actor {
   attach(look.sex === "male" ? "Eyebrows_Regular" : "Eyebrows_Female", look.hairColor);
   if (look.hair !== "none") attach(look.hair, look.hairColor);
   if (look.beard) attach("Beard", look.hairColor);
+
+  if (look.glasses) head.add(makeGlasses(head));
 
   // Clothes
   const dress = (geo: THREE.BufferGeometry, color: string, roughness: number) => {
@@ -246,6 +286,7 @@ export function lookToActor(look: Look, index: number): ActorLook {
     hair,
     hairColor: look.hair,
     beard: look.accessory === "mustache" && !female,
+    glasses: look.accessory === "glasses",
     shirt: look.shirt,
     pants: look.pants,
     shoes: look.shoes,
