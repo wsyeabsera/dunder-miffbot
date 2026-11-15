@@ -91,6 +91,11 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   ring.userData.noShadow = true;
   scene.add(ring);
 
+  // Everyone lives in one named group in the scene, so the whole crowd can be found, hidden or moved together.
+  const people = new THREE.Group();
+  people.name = "people";
+  scene.add(people);
+
   const agents: Agent[] = employees.slice(0, level.seats.length).map((e, i) => {
     const seat = e.post === "reception" ? reception : spread(nextDesk++);
     const actor = createActor(kit, lookToActor(e.look, i));
@@ -117,7 +122,8 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
     g.add(proxy);
     g.position.set(seat.x, 0, seat.z);
     g.rotation.y = seat.face;
-    scene.add(g);
+    g.name = e.name;
+    people.add(g);
     return {
       e, actor, seat, spot: seat, path: [], walking: false, stay: rand(1, 14), sit: 1, phase: i * 1.7, speed: rand(1.25, 1.75),
       heading: seat.face, lift: SIT_LIFT.chair, variant: i, marker, zzz, name, clip: "",
