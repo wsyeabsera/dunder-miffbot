@@ -20,7 +20,7 @@ npm run build    # type check and production build
 | 1, 2, 3, 4 | overhead, follow, through their eyes, walk (WASD, Shift runs, E talks to who you look at) |
 | Esc | back to overhead (once to free the mouse in walk mode, again to leave) |
 
-The list on the left finds people; the minimap jumps to a room or a person.
+The list on the left finds people; the minimap jumps to a room or a person. The panel shows what the selected person is doing right now. Add `?webgpu` to the address to draw with three.js's WebGPU renderer (see `docs/webgpu-spike.md`).
 
 ## Deploy
 
@@ -38,7 +38,8 @@ The Worker (`worker/`) serves the static site only to a signed-in visitor (signe
 - `src/actors.ts` skinned characters and clothing; `public/assets/characters/` the CC0 models and animations
 - `src/camera-rig.ts` the four camera modes; `src/engine/physics.ts` Rapier physics for walk mode
 - `src/lite-model.ts`, `scripts/lite/` designing models in Lite and loading them here (`docs/lite-asset-format.md`)
-- `docs/` design notes: office UI, big office, engine, Lite assets
+- `src/engine/` behaviour, movement and world state (pure, tested), physics
+- `docs/` design notes: office UI, big office, engine, Lite assets, performance, WebGPU spike
 
 ## Credits
 
