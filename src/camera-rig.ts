@@ -211,6 +211,11 @@ export class CameraRig {
     }
   }
 
+  /** True while the overhead view is zoomed out far enough to read room names without them covering the furniture. */
+  get overview(): boolean {
+    return this.mode === "iso" && this.viewH > 24;
+  }
+
   /** A size factor for things drawn over the scene (bubbles): constant on screen whatever the zoom or distance. 1 is about 2.3 units wide. */
   labelScale(distance: number): number {
     const k = this.mode === "iso" ? this.viewH / 50 : distance / 9;

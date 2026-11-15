@@ -219,7 +219,6 @@ export function buildLevel(): Level {
   add({ kind: "plant-tall", x: 7, z: 19 });
   add({ kind: "plant-tall", x: -7, z: 9.5 });
   add({ kind: "plant-fern", x: 7, z: 9.5 });
-  add({ kind: "poster", x: 5, z: z1 - 0.05, rot: 2, text: "WELCOME", sub: "Please sign in at the desk", color: "#e0556b" });
 
   // ---- Library
   for (const bx of [10, 14]) {

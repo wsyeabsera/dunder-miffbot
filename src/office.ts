@@ -390,7 +390,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       crosshair.dataset.target = who;
       crosshair.querySelector(".who")!.textContent = who;
     }
-    roomLabels.visible = rig.mode === "iso";
+    roomLabels.visible = rig.overview;
 
     const sel = agents.find((a) => a.e.id === selected);
     ring.visible = sel !== undefined && rig.mode !== "pov";
