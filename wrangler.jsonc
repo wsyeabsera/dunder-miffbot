@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dunder-miffbot",
+  // Pinned so a deploy cannot land on another account (same account as lite).
+  "account_id": "3d134ec9e5eb3d05d601e9c6c2c071a5",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist" }
+}
