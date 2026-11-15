@@ -20,6 +20,16 @@ Measured 2026-11-15 on one laptop (Apple Silicon, Chrome, 120 Hz display), dev s
 - Rapier (4 MB of WebAssembly) loads only the first time someone walks. three.js is its own cached chunk; our own code is about 52 KB.
 - Animation files trimmed to the 11 clips in use (15 MB to 2 MB); assets are 20 MB.
 
+## Download sizes (production build)
+
+| Piece | Size | Loads |
+|---|---|---|
+| Our code | 56 KB | always |
+| three.js | 659 KB | always (cached across releases) |
+| Rapier physics | 4.3 MB | the first time someone walks |
+| three.js WebGPU renderer | 611 KB | only with `?webgpu` |
+| Characters, animations, textures | 20 MB | always (behind the "Opening the office" screen) |
+
 ## Not measured
 
 - Slower machines, integrated GPUs, 60 Hz displays: frame rate there may be lower; the mood lights (about 8 fps on an earlier run) and the 4096 shadow map are the first things to reduce.
