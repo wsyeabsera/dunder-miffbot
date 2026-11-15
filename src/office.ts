@@ -3,7 +3,7 @@ import { employees, type Employee, type Status } from "./state.ts";
 import { makeLabel } from "./models.ts";
 import { createActor, lookToActor, type Actor, type Kit } from "./actors.ts";
 import { CameraRig, type Mode, type Subject } from "./camera-rig.ts";
-import { buildLevel, type Activity, type Spot } from "./world/level.ts";
+import { buildLevel, type Activity, type Level, type Spot } from "./world/level.ts";
 import { buildWorld } from "./world/build.ts";
 import type { Pt } from "./world/grid.ts";
 
@@ -46,6 +46,14 @@ type Agent = {
 export type Office = {
   select(id: string | null): void;
   setMode(mode: Mode): void;
+  /** Look at someone: move the overhead view to them. */
+  focus(id: string): void;
+  /** Move the overhead view to a point on the floor. */
+  focusPoint(x: number, z: number): void;
+  /** Everyone's place on the floor, plus the boss when walking, for the minimap. */
+  positions(): { id: string; x: number; z: number; status: Status }[];
+  boss(): { x: number; z: number; heading: number } | null;
+  readonly level: Level;
   readonly mode: Mode;
 };
 
@@ -53,8 +61,15 @@ type Hooks = { onSelect(id: string | null): void; onMode(mode: Mode): void; fade
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
-export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, hooks: Hooks, kit: Kit): Office {
+/** Where the boss appears in walk mode: inside the manager's office, facing the door. */
+const BOSS = { x: 9, z: -12, heading: 0 };
+
+export async function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, hooks: Hooks, kit: Kit): Promise<Office> {
   const level = buildLevel();
+  // Physics (Rapier, WebAssembly) is loaded on demand: it is only needed for walk mode.
+  const { createPhysics } = await import("./engine/physics.ts");
+  const physics = await createPhysics(level);
+  const walker = physics.walker(BOSS.x, BOSS.z);
   const world = buildWorld(level);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -90,6 +105,24 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   ring.visible = false;
   ring.userData.noShadow = true;
   scene.add(ring);
+
+  // Room names on the floor, shown in the overhead view
+  const roomLabels = new THREE.Group();
+  roomLabels.name = "room labels";
+  for (const r of level.rooms) {
+    const label = makeLabel(r.name, "#e8ecf4");
+    label.scale.set(3, 0.75, 1);
+    label.position.set((r.rect.x0 + r.rect.x1) / 2, 0.3, (r.rect.z0 + r.rect.z1) / 2);
+    (label.material as THREE.SpriteMaterial).opacity = 0.75;
+    roomLabels.add(label);
+  }
+  scene.add(roomLabels);
+
+  // Materials of blinking lights (racks, machines): merged with the static props, so one material per colour
+  const ledMaterials = new Set<THREE.MeshStandardMaterial>();
+  world.root.traverse((o) => {
+    if (o instanceof THREE.Mesh && o.userData.merged && (o.material as THREE.MeshStandardMaterial).emissiveIntensity === 1.2) ledMaterials.add(o.material as THREE.MeshStandardMaterial);
+  });
 
   // Everyone lives in one named group in the scene, so the whole crowd can be found, hidden or moved together.
   const people = new THREE.Group();
@@ -285,6 +318,8 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   const rig = new CameraRig(canvas, {
     fade: hooks.fade,
     blocked: (x, z) => level.walls.solidAt(x, z),
+    walker,
+    spawn: BOSS,
     onMode: (m) => hooks.onMode(m),
     onTap: (ev) => {
       const id = pick(ev);
@@ -311,7 +346,7 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   }
 
   function setMode(mode: Mode) {
-    if (mode !== "iso" && !selected) hooks.onSelect(agents[0].e.id);
+    if ((mode === "follow" || mode === "pov") && !selected) hooks.onSelect(agents[0].e.id);
     rig.setMode(mode);
   }
   window.addEventListener("keydown", (ev) => {
@@ -321,7 +356,31 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
     else if (ev.key === "1") setMode("iso");
     else if (ev.key === "2") setMode("follow");
     else if (ev.key === "3") setMode("pov");
+    else if (ev.key === "4") setMode("walk");
+    else if (ev.key.toLowerCase() === "e") interact();
   });
+  canvas.addEventListener("click", () => {
+    if (document.pointerLockElement === canvas) interact();
+  });
+
+  // Walking or looking through someone's eyes: the crosshair names whoever you look at, and E (or a click) opens them.
+  const crosshair = document.querySelector<HTMLElement>("#crosshair");
+  const centre = new THREE.Vector2(0, 0);
+  let looked: string | null = null;
+  function lookAt(): string | null {
+    raycaster.setFromCamera(centre, rig.camera);
+    for (const hit of raycaster.intersectObjects(pickables, true)) {
+      const id = hit.object.userData.employeeId as string | undefined;
+      if (id && hit.distance < 12) return id;
+      if (hit.object.userData.seatId) break;
+    }
+    return null;
+  }
+  function interact() {
+    if ((rig.mode !== "walk" && rig.mode !== "pov") || !looked) return;
+    hooks.onSelect(looked);
+    if (document.pointerLockElement === canvas) document.exitPointerLock(); // free the mouse so the task box can be used
+  }
 
   function select(id: string | null) {
     selected = id;
@@ -350,7 +409,7 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
       move(a, dt);
       const inPov = rig.mode === "pov" && a === focus;
       pose(a, dt, inPov);
-      a.marker.visible = !inPov;
+      a.marker.visible = rig.mode === "iso" || (rig.mode === "follow" && a === focus);
       a.name.visible = !inPov && (a.e.id === selected || a.e.id === hovered);
     }
 
@@ -384,6 +443,20 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
       if (m) m.emissiveIntensity = approach(m.emissiveIntensity, target, 0.2);
     }
     world.steam(time);
+    // Server and machine lights blink
+    const blink = Math.sin(time * 7) > 0 ? 1.2 : 0.35;
+    for (const m of ledMaterials) m.emissiveIntensity = blink;
+
+    // Crosshair and who is under it
+    const first = rig.mode === "walk" || rig.mode === "pov";
+    if (crosshair) {
+      crosshair.hidden = !first;
+      looked = first ? lookAt() : null;
+      const who = looked ? agents.find((a) => a.e.id === looked)?.e.name ?? "" : "";
+      crosshair.dataset.target = who;
+      crosshair.querySelector(".who")!.textContent = who;
+    }
+    roomLabels.visible = rig.mode === "iso";
 
     const sel = agents.find((a) => a.e.id === selected);
     ring.visible = sel !== undefined && rig.mode !== "pov";
@@ -394,6 +467,14 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   return {
     select,
     setMode,
+    level,
+    focusPoint: (x, z) => rig.focus(x, z),
+    focus(id) {
+      const a = agents.find((x) => x.e.id === id);
+      if (a) rig.focus(a.actor.group.position.x, a.actor.group.position.z);
+    },
+    positions: () => agents.map((a) => ({ id: a.e.id, x: a.actor.group.position.x, z: a.actor.group.position.z, status: a.e.status })),
+    boss: () => (rig.mode === "walk" ? { ...rig.walkPosition(), heading: 0 } : null),
     get mode() {
       return rig.mode;
     },

@@ -57,3 +57,19 @@ kbd { margin-left: 6px; padding: 0 5px; border-radius: 4px; border: 1px solid va
 #fade.on { opacity: 1; }
 #stage[data-mode="pov"] .title, #stage[data-mode="pov"] .hint { opacity: 0.7; }
 #loading { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); font-size: 16px; background: var(--bg); }
+
+#crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; text-align: center; }
+#crosshair[hidden] { display: none; }
+#crosshair .dot { display: block; width: 6px; height: 6px; margin: 0 auto; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.45); }
+#crosshair .who { display: block; margin-top: 10px; padding: 2px 8px; border-radius: 6px; font-size: 13px; background: rgba(10,14,24,.75); color: var(--text); }
+#crosshair[data-target=""] .who { display: none; }
+
+#people { position: absolute; top: 76px; left: 16px; width: 210px; max-height: calc(100% - 200px); display: flex; flex-direction: column; border-radius: 12px; background: color-mix(in srgb, var(--panel) 90%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); overflow: hidden; }
+#people input { margin: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+#people ul { margin: 0; padding: 0 4px 6px; list-style: none; overflow-y: auto; }
+#people li button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left; font-size: 13px; }
+#people li button:hover { background: var(--line); }
+#people .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+#minimap { position: absolute; left: 16px; bottom: 18px; width: 240px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+#stage[data-mode="pov"] #people, #stage[data-mode="walk"] #people, #stage[data-mode="follow"] #people { opacity: 0.35; }
+#stage[data-mode="walk"] .hint { opacity: 0.9; }

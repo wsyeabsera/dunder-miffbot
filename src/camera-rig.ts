@@ -2,8 +2,9 @@
 // follow and POV are one perspective camera. Switching modes fades through a short overlay instead of a hard cut.
 import * as THREE from "three";
 import { BOUNDS } from "./world/level.ts";
+import type { Walker } from "./engine/physics.ts";
 
-export type Mode = "iso" | "follow" | "pov";
+export type Mode = "iso" | "follow" | "pov" | "walk";
 
 /** What the rig needs to know about the employee it follows. */
 export type Subject = {
@@ -25,6 +26,9 @@ type Hooks = {
   onMode(mode: Mode): void;
   /** True when a point on the floor is inside a wall or furniture, so the follow camera can stay out of it. */
   blocked(x: number, z: number): boolean;
+  /** The boss character for walk mode (physics capsule), and where it appears. */
+  walker: Walker;
+  spawn: { x: number; z: number; heading: number };
   fade?: HTMLElement;
 };
 
@@ -48,13 +52,16 @@ export class CameraRig {
   private height = 1;
   private followDistance = 5.5;
   private look = { yaw: 0, pitch: 0 };
+  private walkLook = { yaw: 0, pitch: 0 };
   private keys = new Set<string>();
   private hooks: Hooks;
+  private canvas: HTMLCanvasElement;
   private smooth = new THREE.Vector3();
   private smoothReady = false;
 
   constructor(canvas: HTMLCanvasElement, hooks: Hooks) {
     this.hooks = hooks;
+    this.canvas = canvas;
     this.persp.rotation.order = "YXZ";
 
     let down: { x: number; y: number } | null = null;
@@ -72,8 +79,17 @@ export class CameraRig {
       last = { x: e.clientX, y: e.clientY };
     });
     canvas.addEventListener("pointerup", (e) => {
-      if (!dragged) hooks.onTap(e);
+      if (!dragged) {
+        // In walk mode a click grabs the mouse; once grabbed, clicks are interactions (office.ts listens for those).
+        if (this.mode === "walk" && document.pointerLockElement !== canvas) canvas.requestPointerLock();
+        else if (this.mode !== "walk") hooks.onTap(e);
+      }
       down = null;
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (this.mode !== "walk" || document.pointerLockElement !== canvas) return;
+      this.walkLook.yaw -= e.movementX * 0.0022;
+      this.walkLook.pitch = Math.max(-1.25, Math.min(1.25, this.walkLook.pitch - e.movementY * 0.0022));
     });
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
@@ -110,6 +126,14 @@ export class CameraRig {
     const apply = () => {
       this.mode = mode;
       this.smoothReady = false;
+      if (mode === "walk") {
+        const sp = this.hooks.spawn;
+        this.hooks.walker.place(sp.x, sp.z);
+        this.walkLook = { yaw: Math.PI + sp.heading, pitch: 0 };
+        this.canvas.requestPointerLock();
+      } else if (document.pointerLockElement === this.canvas) {
+        document.exitPointerLock();
+      }
       this.hooks.onMode(mode);
     };
     const fade = this.hooks.fade;
@@ -148,6 +172,7 @@ export class CameraRig {
 
   update(dt: number, subject: Subject | null) {
     if (this.mode === "iso") this.updateIso(dt);
+    else if (this.mode === "walk") this.updateWalk(dt);
     else if (subject) this.mode === "follow" ? this.updateFollow(dt, subject) : this.updatePov(subject);
   }
 
@@ -174,6 +199,32 @@ export class CameraRig {
     this.iso.position.set(this.target.x + Math.sin(this.yaw) * c, Math.sin(ELEVATION) * ISO_DISTANCE, this.target.z + Math.cos(this.yaw) * c);
     this.iso.lookAt(this.target.x, 0, this.target.z);
     this.applyIsoFrustum();
+  }
+
+  /** Where the walking boss stands (feet), for the minimap. */
+  walkPosition() {
+    return this.hooks.walker.position();
+  }
+
+  private updateWalk(dt: number) {
+    const has = (...k: string[]) => k.some((x) => this.keys.has(x));
+    const fwd = (has("w", "arrowup") ? 1 : 0) - (has("s", "arrowdown") ? 1 : 0);
+    const side = (has("d", "arrowright") ? 1 : 0) - (has("a", "arrowleft") ? 1 : 0);
+    const { yaw, pitch } = this.walkLook;
+    if (fwd || side) {
+      const speed = (this.keys.has("shift") ? 5.5 : 3.2) * dt;
+      let dx = -Math.sin(yaw) * fwd + Math.cos(yaw) * side;
+      let dz = -Math.cos(yaw) * fwd - Math.sin(yaw) * side;
+      const len = Math.hypot(dx, dz) || 1;
+      dx = (dx / len) * speed;
+      dz = (dz / len) * speed;
+      this.hooks.walker.move(dx, dz);
+    }
+    const p = this.hooks.walker.position();
+    this.persp.fov = 78;
+    this.persp.updateProjectionMatrix();
+    this.persp.position.set(p.x, 1.65, p.z);
+    this.persp.rotation.set(pitch, yaw, 0);
   }
 
   private updateFollow(dt: number, s: Subject) {
