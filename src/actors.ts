@@ -202,7 +202,15 @@ export function createActor(kit: Kit, look: ActorLook): Actor {
     obj.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         const m = (o.material as THREE.MeshStandardMaterial).clone();
-        if (tint) m.color = new THREE.Color(tint);
+        if (tint) {
+          m.color = new THREE.Color(tint);
+          // The hair texture is brown and the colour is multiplied onto it, so pale hair comes out dark: lift it with a little glow of its own colour
+          const lum = 0.299 * m.color.r + 0.587 * m.color.g + 0.114 * m.color.b;
+          if (lum > 0.2) {
+            m.emissive = new THREE.Color(tint);
+            m.emissiveIntensity = Math.min(0.6, (lum - 0.15) * 1.2);
+          }
+        }
         o.material = m;
         o.castShadow = true;
       }
