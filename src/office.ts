@@ -12,7 +12,8 @@ import type { Walker } from "./engine/physics.ts";
 
 const STATUS_COLOR: Record<Status, string> = { working: "#4ade80", idle: "#facc15", resting: "#94a3b8" };
 /** How far to raise a seated person so they sit on the seat: the sitting clip is made for a low seat. Tuned by eye. */
-const SIT_LIFT = { chair: 0.2, soft: 0.0 };
+// Chair seat top 0.77 m needs 0.2; by the same arithmetic the couch cushion (0.63 m) needs 0.06 and the bench (0.54 m) about 0, so soft seats share 0.03.
+const SIT_LIFT = { chair: 0.2, soft: 0.03 };
 const WALL_LOW = 0.38;
 
 /** A person: the simulated entity (src/engine/world.ts) plus everything needed to draw them. */
