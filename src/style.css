@@ -48,3 +48,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .dev button { padding: 4px 8px; font-size: 12px; }
 .signout { position: absolute; top: 12px; right: 16px; padding: 4px 10px; font-size: 12px; background: transparent; }
 .signout[hidden] { display: none; }
+
+#modes { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; border-radius: 12px; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+#modes button { background: transparent; border-color: transparent; padding: 7px 12px; }
+#modes button[aria-pressed="true"] { background: var(--line); border-color: var(--accent); }
+kbd { margin-left: 6px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--line); font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
+#fade { position: absolute; inset: 0; background: #0b0f18; opacity: 0; pointer-events: none; transition: opacity 0.14s; }
+#fade.on { opacity: 1; }
+#stage[data-mode="pov"] .title, #stage[data-mode="pov"] .hint { opacity: 0.7; }

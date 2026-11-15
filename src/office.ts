@@ -1,70 +1,59 @@
 import * as THREE from "three";
 import { employees, type Employee, type Status } from "./state.ts";
-import {
-  makeBin, makeBookshelf, makeChair, makeCharacter, makeClock, makeCoffeeMachine, makeCorkboard, makeCouch, makeDesk,
-  makeFilingCabinet, makeFloorLamp, makeLabel, makeMug, makePlant, makePoster, makePrinter, makeRug, makeSideTable,
-  makeSign, makeWaterCooler, makeWhiteboard, makeWindow,
-  type Character,
-} from "./models.ts";
-
-const ROOM_W = 16;
-const ROOM_D = 14;
-const WALL_H = 3.6;
-const COLUMNS = [-5, -2.5, 0, 2.5, 5];
-const ROW_Z = [2.5, -2.5]; // row 0 is nearest the camera
-export const DESK_SLOTS = COLUMNS.length * ROW_Z.length;
-/** Which desk the nth employee takes: spread across both rows, not one after another. */
-const DESK_ORDER = [0, 8, 2, 6, 4, 9, 1, 7, 3, 5];
-const SEAT_OFFSET = 0.95;
-const WALK_SPEED = 2.2;
-/** How far the body sits above (or below) its standing height on a chair and on the couch. */
-const SIT_LIFT = { desk: 0.03, couch: -0.12 };
+import { makeCharacter, makeLabel, makeMug, type Character } from "./models.ts";
+import { CameraRig, type Mode, type Subject } from "./camera-rig.ts";
+import { buildLevel, type Activity, type Spot } from "./world/level.ts";
+import { buildWorld } from "./world/build.ts";
+import type { Pt } from "./world/grid.ts";
 
 const STATUS_COLOR: Record<Status, string> = { working: "#4ade80", idle: "#facc15", resting: "#94a3b8" };
-
-type Place = "desk" | "coffee" | "couch";
-type Pt = { x: number; z: number };
-type Spot = Pt & { face: number };
-
-/** Places to stand or sit away from the desks: a queue at the coffee machine and seats on the couch. */
-const SPOTS: Record<"coffee" | "couch", Spot[]> = {
-  coffee: [0, 1, 2, 3].map((i) => ({ x: -6.3 + i * 0.9, z: 0, face: -Math.PI / 2 })),
-  couch: [-0.8, 0, 0.8].map((z) => ({ x: 6.9, z, face: -Math.PI / 2 })),
-};
+/** Chance weights and how long (seconds) someone stays, per break activity. */
+const BREAKS: { activity: Activity; weight: number; stay: [number, number] }[] = [
+  { activity: "coffee", weight: 3, stay: [6, 10] },
+  { activity: "lunch", weight: 2, stay: [12, 20] },
+  { activity: "print", weight: 2, stay: [5, 8] },
+  { activity: "restroom", weight: 1.5, stay: [5, 8] },
+  { activity: "couch", weight: 2, stay: [12, 24] },
+  { activity: "terrace", weight: 1.5, stay: [10, 20] },
+  { activity: "library", weight: 1, stay: [6, 12] },
+  { activity: "wander", weight: 1.5, stay: [4, 8] },
+];
+const SIT_LIFT = { chair: 0.03, soft: -0.12 };
+const WALL_LOW = 0.38;
 
 type Agent = {
   e: Employee;
   ch: Character;
-  slot: number;
-  place: Place;
-  spot: number; // which of SPOTS[place] this agent uses
+  seat: Spot;
+  spot: Spot; // where they are, or are heading
   path: Pt[];
   walking: boolean;
-  pause: number;
-  seat: number; // 0 standing .. 1 seated
+  stay: number;
+  sit: number; // 0 standing .. 1 seated
   phase: number;
+  speed: number;
+  heading: number;
   marker: THREE.Mesh;
   zzz: THREE.Sprite;
   name: THREE.Sprite;
   mug: THREE.Group;
-  heading: number;
-  finalFace: number;
   nextBlink: number;
 };
 
-function seatPoint(slot: number): Spot {
-  const row = Math.floor(slot / COLUMNS.length);
-  const x = COLUMNS[slot % COLUMNS.length];
-  return row === 0 ? { x, z: ROW_Z[0] - SEAT_OFFSET, face: 0 } : { x, z: ROW_Z[1] + SEAT_OFFSET, face: Math.PI };
-}
+export type Office = {
+  select(id: string | null): void;
+  setMode(mode: Mode): void;
+  readonly mode: Mode;
+};
 
-function spotFor(a: Agent): Spot {
-  return a.place === "desk" ? seatPoint(a.slot) : SPOTS[a.place][a.spot];
-}
+type Hooks = { onSelect(id: string | null): void; onMode(mode: Mode): void; fade?: HTMLElement };
 
-export type Office = { select(id: string | null): void };
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
-export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, onSelect: (id: string | null) => void): Office {
+export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, hooks: Hooks): Office {
+  const level = buildLevel();
+  const world = buildWorld(level);
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -73,51 +62,25 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#1d2433");
-
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-  camera.position.set(14, 14, 14);
-  camera.lookAt(0, 1, 0);
-
   scene.add(new THREE.HemisphereLight("#e6eeff", "#4a5070", 1.25));
   const sun = new THREE.DirectionalLight("#fff1dc", 1.9);
-  sun.position.set(9, 15, 11);
+  sun.position.set(34, 46, 40);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -14;
-  sun.shadow.camera.right = 14;
-  sun.shadow.camera.top = 14;
-  sun.shadow.camera.bottom = -14;
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 40;
-  sun.shadow.bias = -0.0004;
+  sun.shadow.mapSize.set(4096, 4096);
+  const box = sun.shadow.camera;
+  box.left = -50; box.right = 50; box.top = 50; box.bottom = -50; box.near = 1; box.far = 140;
+  sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.04;
-  sun.shadow.radius = 4;
+  sun.shadow.radius = 3;
   scene.add(sun);
+  scene.add(world.root);
 
-  const steam = buildRoom(scene);
+  // ---- People
+  const reception = level.seats.find((s) => s.reception)!;
+  const desks = level.seats.filter((s) => !s.reception);
+  const spread = (i: number) => desks[(i * 11) % desks.length]; // spread the first employees across the floor
+  let nextDesk = 0;
 
-  // Desks and chairs. Screens are kept so they can glow with their occupant's status.
-  const screens = new Map<number, THREE.MeshStandardMaterial>();
-  for (let slot = 0; slot < DESK_SLOTS; slot++) {
-    const row = Math.floor(slot / COLUMNS.length);
-    const x = COLUMNS[slot % COLUMNS.length];
-    const desk = makeDesk();
-    desk.position.set(x, 0, ROW_Z[row]);
-    desk.rotation.y = row === 0 ? Math.PI : 0;
-    desk.traverse((o) => {
-      o.userData.slot = slot;
-      if (o.userData.isScreen) screens.set(slot, (o as THREE.Mesh).material as THREE.MeshStandardMaterial);
-    });
-    scene.add(desk);
-    const chair = makeChair();
-    const seat = seatPoint(slot);
-    chair.position.set(seat.x, 0, seat.z);
-    chair.rotation.y = row === 0 ? 0 : Math.PI;
-    chair.rotation.y += (slot % 3 - 1) * 0.12; // not all lined up
-    scene.add(chair);
-  }
-
-  // Selection ring
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: "#7aa2ff", side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.04;
@@ -125,9 +88,8 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   ring.userData.noShadow = true;
   scene.add(ring);
 
-  // Employees
-  const agents: Agent[] = employees.slice(0, DESK_SLOTS).map((e, i) => {
-    const slot = DESK_ORDER[i];
+  const agents: Agent[] = employees.slice(0, level.seats.length).map((e, i) => {
+    const seat = e.post === "reception" ? reception : spread(nextDesk++);
     const ch = makeCharacter(e.look);
     ch.group.traverse((o) => (o.userData.employeeId = e.id));
     const name = makeLabel(e.name);
@@ -150,132 +112,184 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
     mug.rotation.y = Math.PI / 2;
     mug.visible = false;
     ch.rightForearm.add(mug);
-    const spot = seatPoint(slot);
-    ch.group.position.set(spot.x, 0, spot.z);
-    ch.group.rotation.y = spot.face;
+    ch.group.position.set(seat.x, 0, seat.z);
+    ch.group.rotation.y = seat.face;
+    ch.group.traverse((o) => {
+      if (o instanceof THREE.Mesh && !o.userData.noShadow) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
+    });
     scene.add(ch.group);
     return {
-      e, ch, slot, place: "desk", spot: 0, path: [], walking: false, pause: 0, seat: 0, phase: slot,
-      marker, zzz, name, mug, heading: spot.face, finalFace: spot.face, nextBlink: 2 + i,
+      e, ch, seat, spot: seat, path: [], walking: false, stay: rand(1, 14), sit: 1, phase: i * 1.7, speed: rand(1.25, 1.75),
+      heading: seat.face, marker, zzz, name, mug, nextBlink: 2 + (i % 5),
     } satisfies Agent;
   });
 
-  // Shadows: everything that is solid casts and receives, except the markers
-  scene.traverse((o) => {
-    if (o instanceof THREE.Mesh && !o.userData.noShadow) {
-      o.castShadow = true;
-      o.receiveShadow = true;
-    }
-  });
+  // ---- Reservations: one person per spot. Desks belong to their owner.
+  const holder = new Map<string, Agent>();
+  for (const a of agents) holder.set(a.seat.id, a);
 
-  let selected: string | null = null;
-  let hovered: string | null = null;
-
-  /** Walk to a place. Returns false (and stays put) when every spot there is taken. */
-  function walkTo(a: Agent, place: Place): boolean {
-    if (place !== "desk") {
-      const free = SPOTS[place].findIndex((_, i) => !agents.some((o) => o !== a && o.place === place && o.spot === i));
-      if (free < 0) return false;
-      a.spot = free;
+  const route = (a: Agent, to: Spot): Pt[] => {
+    const pos = a.ch.group.position;
+    const pts: Pt[] = [];
+    let start: Pt = { x: pos.x, z: pos.z };
+    if (!a.walking && Math.hypot(pos.x - a.spot.x, pos.z - a.spot.z) < 0.3) {
+      pts.push(a.spot.approach); // step out of the chair first
+      start = a.spot.approach;
     }
-    a.place = place;
-    const dest = spotFor(a);
-    const p = a.ch.group.position;
-    const path: Pt[] = [];
-    // Everyone walks along the aisle (z = 0), which no desk blocks.
-    if (Math.abs(p.z) > 0.01) path.push({ x: p.x, z: 0 });
-    path.push({ x: dest.x, z: 0 });
-    if (dest.z !== 0) path.push({ x: dest.x, z: dest.z });
-    a.path = path;
-    a.finalFace = dest.face;
-    a.walking = true;
-    return true;
+    const mid = level.grid.path(start, to.approach);
+    if (mid) pts.push(...mid);
+    else pts.push(to.approach);
+    if (to.approach.x !== to.x || to.approach.z !== to.z) pts.push({ x: to.x, z: to.z });
+    return pts;
+  };
+
+  function goTo(a: Agent, to: Spot) {
+    if (holder.get(a.spot.id) === a && a.spot !== a.seat) holder.delete(a.spot.id);
+    holder.set(to.id, a);
+    a.path = route(a, to);
+    a.spot = to;
+    a.walking = a.path.length > 0;
+  }
+
+  function pickBreak(a: Agent) {
+    const options = BREAKS.map((b) => ({ ...b, free: level.spots.filter((s) => s.activity === b.activity && !holder.has(s.id)) })).filter((b) => b.free.length);
+    const total = options.reduce((t, o) => t + o.weight, 0);
+    let r = Math.random() * total;
+    for (const o of options) {
+      if ((r -= o.weight) <= 0) {
+        goTo(a, o.free[Math.floor(Math.random() * o.free.length)]);
+        a.stay = rand(o.stay[0], o.stay[1]);
+        return;
+      }
+    }
   }
 
   function decide(a: Agent, dt: number) {
-    if (a.e.status === "idle") {
-      if (a.walking) return;
-      a.pause -= dt;
-      if (a.place !== "desk" && a.pause > 0) return;
-      const options: Place[] =
-        a.place === "coffee" ? ["couch", "coffee"] : a.place === "couch" ? ["coffee", "couch"] : Math.random() < 0.5 ? ["coffee", "couch"] : ["couch", "coffee"];
-      if (!options.some((p) => (p === a.place ? true : walkTo(a, p)))) a.pause = 2;
-      else if (a.place !== "desk") a.pause = 3 + Math.random() * 3;
-    } else if (a.place !== "desk") {
-      walkTo(a, "desk");
+    if (a.walking) return;
+    if (a.e.status !== "idle") {
+      if (a.spot !== a.seat) goTo(a, a.seat);
+      return;
+    }
+    a.stay -= dt;
+    if (a.stay > 0) return;
+    // Back to the desk now and then, otherwise somewhere else
+    if (a.spot !== a.seat && Math.random() < 0.3) {
+      goTo(a, a.seat);
+      a.stay = rand(6, 14);
+    } else {
+      pickBreak(a);
+      if (!a.walking) a.stay = rand(3, 6);
     }
   }
 
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   const approach = (cur: number, target: number, k: number) => cur + (target - cur) * clamp01(k);
+  const soft = (a: Agent) => a.spot.pose === "sitSoft";
 
-  function animate(a: Agent, dt: number, time: number) {
-    const { ch } = a;
-    const g = ch.group;
-
-    // Movement
+  function move(a: Agent, dt: number) {
+    const g = a.ch.group;
     if (a.walking) {
       const next = a.path[0];
       const dx = next.x - g.position.x;
       const dz = next.z - g.position.z;
       const dist = Math.hypot(dx, dz);
-      const step = WALK_SPEED * dt;
+      const step = a.speed * dt;
       if (dist <= step) {
         g.position.x = next.x;
         g.position.z = next.z;
         a.path.shift();
-        if (a.path.length === 0) {
+        if (!a.path.length) {
           a.walking = false;
-          a.heading = a.finalFace;
-          a.pause = 3 + Math.random() * 3;
+          a.heading = a.spot.face;
         }
       } else {
-        g.position.x += (dx / dist) * step;
-        g.position.z += (dz / dist) * step;
+        let mx = (dx / dist) * step;
+        let mz = (dz / dist) * step;
+        // Keep a little distance from people who are standing or walking nearby
+        for (const o of agents) {
+          if (o === a || o.sit > 0.5) continue;
+          const ox = g.position.x - o.ch.group.position.x;
+          const oz = g.position.z - o.ch.group.position.z;
+          const d = Math.hypot(ox, oz);
+          if (d < 0.7 && d > 0.001) {
+            mx += (ox / d) * (0.7 - d) * dt * 2;
+            mz += (oz / d) * (0.7 - d) * dt * 2;
+          }
+        }
+        if (!level.walls.solidAt(g.position.x + mx, g.position.z + mz)) {
+          g.position.x += mx;
+          g.position.z += mz;
+        } else {
+          g.position.x += (dx / dist) * step;
+          g.position.z += (dz / dist) * step;
+        }
         a.heading = Math.atan2(dx, dz);
-        a.phase += dt * 9;
+        a.phase += dt * a.speed * 5.5;
       }
     }
     let dh = a.heading - g.rotation.y;
     dh = Math.atan2(Math.sin(dh), Math.cos(dh));
     g.rotation.y += dh * clamp01(dt * 10);
+  }
 
-    // Pose
-    const sitting = !a.walking && (a.place === "desk" || a.place === "couch");
-    a.seat = approach(a.seat, sitting ? 1 : 0, dt * 6);
-    g.position.y = (a.place === "couch" ? SIT_LIFT.couch : SIT_LIFT.desk) * a.seat;
+  function pose(a: Agent, dt: number, time: number, hidden: boolean) {
+    const { ch } = a;
+    const g = ch.group;
+    const seated = !a.walking && ["desk", "sit", "sitSoft"].includes(a.spot.pose);
+    a.sit = approach(a.sit, seated ? 1 : 0, dt * 6);
+    g.position.y = (soft(a) ? SIT_LIFT.soft : SIT_LIFT.chair) * a.sit;
 
     const k = dt * 12;
-    let armL = 0, armR = 0, foreL = 0, foreR = 0, legL = 0, legR = 0, head = 0, headTurn = 0, bob = 0;
-    const atCoffee = !a.walking && a.place === "coffee";
+    let armL = 0, armR = 0, foreL = -0.15, foreR = -0.15, legL = 0, legR = 0, head = 0, turn = 0, bob = 0;
+    const p = a.spot.pose;
+    const here = !a.walking;
     if (a.walking) {
       const s = Math.sin(a.phase);
       armL = s * 0.7; armR = -s * 0.7; foreL = -0.25 - Math.max(0, -s) * 0.3; foreR = -0.25 - Math.max(0, s) * 0.3;
       legL = -s * 0.6; legR = s * 0.6;
       bob = Math.abs(Math.cos(a.phase)) * 0.06;
-    } else if (a.e.status === "working" && a.place === "desk") {
-      armL = -0.5; armR = -0.5;
-      foreL = -0.95 + Math.sin(time * 14 + a.slot) * 0.12;
-      foreR = -0.95 + Math.sin(time * 14 + a.slot + Math.PI) * 0.12;
-      head = 0.1 + Math.sin(time * 1.7 + a.slot) * 0.04;
-      headTurn = Math.sin(time * 0.6 + a.slot * 2) * 0.12;
-    } else if (a.e.status === "resting") {
-      armL = -0.3; armR = -0.3; foreL = -0.8; foreR = -0.8; head = 0.95;
-      bob = Math.sin(time * 1.5 + a.slot) * 0.015;
-    } else if (atCoffee) {
-      armL = 0.05; foreL = -0.2;
-      const sip = Math.max(0, Math.sin(time * 0.9 + a.slot * 1.7));
+    } else if (p === "desk") {
+      if (a.e.status === "working") {
+        armL = -0.5; armR = -0.5;
+        foreL = -0.95 + Math.sin(time * 14 + a.phase) * 0.12;
+        foreR = -0.95 + Math.sin(time * 14 + a.phase + Math.PI) * 0.12;
+        head = 0.1 + Math.sin(time * 1.7 + a.phase) * 0.04;
+        turn = Math.sin(time * 0.6 + a.phase * 2) * 0.12;
+      } else if (a.e.status === "resting") {
+        armL = -0.3; armR = -0.3; foreL = -0.8; foreR = -0.8; head = 0.95;
+        bob = Math.sin(time * 1.5 + a.phase) * 0.015;
+      } else {
+        armL = -0.4; armR = -0.4; foreL = -0.7; foreR = -0.7; head = 0.05;
+        turn = Math.sin(time * 0.5 + a.phase) * 0.35;
+      }
+    } else if (here && p === "sip") {
+      const sip = Math.max(0, Math.sin(time * 0.9 + a.phase));
       armR = -0.55 - sip * 0.2; foreR = -1.2 - sip * 0.8;
       head = -0.1 - sip * 0.15;
-      headTurn = (1 - sip) * Math.sin(time * 0.5 + a.slot) * 0.3;
-    } else if (a.place === "couch") {
+      turn = (1 - sip) * Math.sin(time * 0.5 + a.phase) * 0.3;
+    } else if (here && p === "sit") {
+      armL = -0.4; armR = -0.5; foreL = -0.8;
+      foreR = -1.0 - Math.max(0, Math.sin(time * 1.1 + a.phase)) * 0.8;
+      head = 0.1;
+      turn = Math.sin(time * 0.4 + a.phase) * 0.3;
+    } else if (here && p === "sitSoft") {
       armL = -0.35; armR = -0.35; foreL = -0.9; foreR = -0.9;
       head = 0.05;
-      headTurn = Math.sin(time * 0.4 + a.slot) * 0.25;
+      turn = Math.sin(time * 0.4 + a.phase) * 0.25;
+    } else if (here && a.spot.activity === "print") {
+      armL = -0.5; armR = -0.5; foreL = -0.8 + Math.sin(time * 2 + a.phase) * 0.05; foreR = -0.8;
+      head = 0.15;
+    } else if (here && a.spot.activity === "library") {
+      armL = -0.7; armR = -0.7; foreL = -1.2; foreR = -1.2;
+      head = 0.3;
+      turn = Math.sin(time * 0.5 + a.phase) * 0.2;
     } else {
-      foreL = -0.15; foreR = -0.15;
+      turn = Math.sin(time * 0.45 + a.phase) * 0.5;
     }
-    const legSit = (-Math.PI / 2) * a.seat;
+    const legSit = (-Math.PI / 2) * a.sit;
     ch.leftArm.rotation.x = approach(ch.leftArm.rotation.x, armL, k);
     ch.rightArm.rotation.x = approach(ch.rightArm.rotation.x, armR, k);
     ch.leftForearm.rotation.x = approach(ch.leftForearm.rotation.x, foreL, k);
@@ -283,195 +297,143 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
     ch.leftLeg.rotation.x = approach(ch.leftLeg.rotation.x, legSit + legL, k);
     ch.rightLeg.rotation.x = approach(ch.rightLeg.rotation.x, legSit + legR, k);
     ch.head.rotation.x = approach(ch.head.rotation.x, head, k);
-    ch.head.rotation.y = approach(ch.head.rotation.y, headTurn, dt * 6);
+    ch.head.rotation.y = approach(ch.head.rotation.y, turn, dt * 6);
     ch.body.position.y = approach(ch.body.position.y, bob, k);
-    a.mug.visible = atCoffee;
+    a.mug.visible = here && (p === "sip" || (p === "sit" && a.spot.activity === "lunch"));
 
-    // Blink
+    // Blink, and shut the eyes when resting
+    const resting = a.e.status === "resting" && p === "desk" && here;
+    let closed = resting;
     if (time > a.nextBlink) {
       const t = time - a.nextBlink;
-      const closed = a.e.status === "resting" || t < 0.12;
-      for (const eye of ch.eyes) eye.scale.y = closed ? 0.1 : 1.1;
+      closed = closed || t < 0.12;
       if (t >= 0.12) a.nextBlink = time + 2.5 + Math.random() * 3;
-    } else if (a.e.status === "resting") {
-      for (const eye of ch.eyes) eye.scale.y = 0.1;
-    } else {
-      for (const eye of ch.eyes) eye.scale.y = 1.1;
     }
+    for (const eye of ch.eyes) eye.scale.y = closed ? 0.1 : 1.1;
 
     (a.marker.material as THREE.MeshBasicMaterial).color.set(STATUS_COLOR[a.e.status]);
-    a.zzz.visible = a.e.status === "resting" && a.place === "desk" && !a.walking;
+    a.zzz.visible = resting && !hidden;
     if (a.zzz.visible) a.zzz.position.y = 2.4 + ((time * 0.5) % 1) * 0.3;
-    a.name.visible = a.e.id === selected || a.e.id === hovered;
   }
 
-  // Selection and picking
+  // ---- Camera and picking
+  let selected: string | null = null;
+  let hovered: string | null = null;
+  const pickables: THREE.Object3D[] = [...agents.map((a) => a.ch.group), ...world.deskProxies];
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+  const subject: Subject = { position: new THREE.Vector3(), heading: 0, eye: new THREE.Vector3(), pitch: 0, turn: 0 };
+
+  const rig = new CameraRig(canvas, {
+    fade: hooks.fade,
+    onMode: (m) => hooks.onMode(m),
+    onTap: (ev) => {
+      const id = pick(ev);
+      if (id !== selected) hooks.onSelect(id);
+    },
+    onHover: (ev) => {
+      hovered = pick(ev);
+      canvas.style.cursor = hovered ? "pointer" : "default";
+    },
+  });
+  canvas.addEventListener("pointerleave", () => (hovered = null));
+
   function pick(ev: PointerEvent): string | null {
     const r = canvas.getBoundingClientRect();
     pointer.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
-    raycaster.setFromCamera(pointer, camera);
-    for (const hit of raycaster.intersectObjects(scene.children, true)) {
+    raycaster.setFromCamera(pointer, rig.camera);
+    for (const hit of raycaster.intersectObjects(pickables, true)) {
       const id = hit.object.userData.employeeId as string | undefined;
       if (id) return id;
-      const slot = hit.object.userData.slot as number | undefined;
-      if (slot !== undefined) return agents.find((a) => a.slot === slot)?.e.id ?? null;
+      const seatId = hit.object.userData.seatId as string | undefined;
+      if (seatId) return holder.get(seatId)?.e.id ?? null;
     }
     return null;
   }
-  canvas.addEventListener("pointerdown", (ev) => {
-    const id = pick(ev);
-    if (id !== selected) onSelect(id);
+
+  function setMode(mode: Mode) {
+    if (mode !== "iso" && !selected) hooks.onSelect(agents[0].e.id);
+    rig.setMode(mode);
+  }
+  window.addEventListener("keydown", (ev) => {
+    const t = ev.target;
+    if (t instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (ev.key === "Escape") setMode("iso");
+    else if (ev.key === "1") setMode("iso");
+    else if (ev.key === "2") setMode("follow");
+    else if (ev.key === "3") setMode("pov");
   });
-  canvas.addEventListener("pointermove", (ev) => {
-    hovered = pick(ev);
-    canvas.style.cursor = hovered ? "pointer" : "default";
-  });
-  canvas.addEventListener("pointerleave", () => (hovered = null));
 
   function select(id: string | null) {
     selected = id;
     ring.visible = id !== null;
   }
 
-  // Sizing: the room always fits, whatever the window shape
   function resize() {
     const w = container.clientWidth || 1;
     const h = container.clientHeight || 1;
-    const aspect = w / h;
-    const fitH = 19;
-    const fitW = 29;
-    const viewH = aspect > fitW / fitH ? fitH : fitW / aspect;
-    camera.left = (-viewH * aspect) / 2;
-    camera.right = (viewH * aspect) / 2;
-    camera.top = viewH / 2;
-    camera.bottom = -viewH / 2;
-    camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(w, h, false);
+    rig.resize(w, h);
   }
   new ResizeObserver(resize).observe(container);
   resize();
 
+  const eye = new THREE.Vector3();
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.1);
     const time = clock.elapsedTime;
+    const focus = rig.mode === "iso" ? null : agents.find((a) => a.e.id === selected) ?? null;
+
     for (const a of agents) {
       decide(a, dt);
-      animate(a, dt, time);
+      move(a, dt);
+      const inPov = rig.mode === "pov" && a === focus;
+      pose(a, dt, time, inPov);
+      a.ch.head.visible = !inPov;
+      a.marker.visible = !inPov;
+      a.name.visible = !inPov && (a.e.id === selected || a.e.id === hovered);
     }
-    // Monitors: lively while someone works, dim when idle or resting, nearly off when the desk is empty
-    for (const [slot, material] of screens) {
-      const who = agents.find((a) => a.slot === slot)?.e.status;
-      const target = who === "working" ? 0.9 + Math.sin(time * 9 + slot) * 0.12 : who === "idle" ? 0.35 : who === "resting" ? 0.08 : 0.15;
-      material.emissiveIntensity = approach(material.emissiveIntensity, target, 0.2);
+
+    if (focus) {
+      focus.ch.group.updateMatrixWorld(true);
+      eye.set(0, 0.26, 0.2);
+      focus.ch.head.localToWorld(eye);
+      subject.position.copy(focus.ch.group.position);
+      subject.heading = focus.ch.group.rotation.y;
+      subject.eye.copy(eye);
+      subject.pitch = focus.ch.head.rotation.x;
+      subject.turn = focus.ch.head.rotation.y;
     }
-    steam(time);
+    rig.update(dt, focus ? subject : null);
+
+    // Walls: low in the overhead view so you can see into the rooms, full height from inside
+    const overhead = rig.mode === "iso";
+    world.walls.interior.scale.y = approach(world.walls.interior.scale.y, overhead ? WALL_LOW : 1, dt * 6);
+    world.walls.front.visible = !overhead;
+
+    // Monitors glow with their owner's work
+    for (const seat of level.seats) {
+      const owner = holder.get(seat.id);
+      const here = owner && owner.spot === seat && !owner.walking;
+      const target = here ? (owner.e.status === "working" ? 0.9 + Math.sin(time * 9 + owner.phase) * 0.12 : owner.e.status === "idle" ? 0.35 : 0.08) : 0.18;
+      const m = world.screens.get(seat.id);
+      if (m) m.emissiveIntensity = approach(m.emissiveIntensity, target, 0.2);
+    }
+    world.steam(time);
+
     const sel = agents.find((a) => a.e.id === selected);
+    ring.visible = sel !== undefined && rig.mode !== "pov";
     if (sel) ring.position.set(sel.ch.group.position.x, 0.04, sel.ch.group.position.z);
-    renderer.render(scene, camera);
+    renderer.render(scene, rig.camera);
   });
 
-  return { select };
-}
-
-/** Builds the room and everything in it that is not an employee. Returns the per-frame steam animation. */
-function buildRoom(scene: THREE.Scene): (time: number) => void {
-  const at = <T extends THREE.Object3D>(obj: T, x: number, z: number, rotY = 0, y = 0): T => {
-    obj.position.set(x, y, z);
-    obj.rotation.y = rotY;
-    scene.add(obj);
-    return obj;
-  };
-  const backZ = -ROOM_D / 2;
-  const leftX = -ROOM_W / 2;
-  const LEFT = Math.PI / 2; // faces +x, into the room from the left wall
-
-  // Floor: two-tone tiles in one instanced mesh
-  const tiles = new THREE.InstancedMesh(new THREE.BoxGeometry(0.98, 0.2, 0.98), new THREE.MeshStandardMaterial({ roughness: 0.85 }), ROOM_W * ROOM_D);
-  const m = new THREE.Matrix4();
-  const colors = [new THREE.Color("#4a5a7e"), new THREE.Color("#414f72")];
-  let i = 0;
-  for (let x = 0; x < ROOM_W; x++) {
-    for (let z = 0; z < ROOM_D; z++) {
-      m.setPosition(x - ROOM_W / 2 + 0.5, -0.1, z - ROOM_D / 2 + 0.5);
-      tiles.setMatrixAt(i, m);
-      tiles.setColorAt(i, colors[(x + z) % 2]);
-      i++;
-    }
-  }
-  scene.add(tiles);
-
-  // Walls: plaster above, darker wainscot below, skirting on top of the floor
-  const wallMat = (c: string) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95 });
-  const wall = (w: number, h: number, d: number, c: string, x: number, y: number, z: number) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat(c));
-    mesh.position.set(x, y, z);
-    scene.add(mesh);
-  };
-  wall(ROOM_W + 0.6, WALL_H, 0.3, "#6a80b8", -0.3, WALL_H / 2, backZ - 0.15);
-  wall(0.3, WALL_H, ROOM_D, "#5f74ab", leftX - 0.15, WALL_H / 2, 0);
-  wall(ROOM_W, 1.1, 0.08, "#4a5a8a", 0, 0.55, backZ + 0.04);
-  wall(0.08, 1.1, ROOM_D, "#45548a", leftX + 0.04, 0.55, 0);
-  wall(ROOM_W, 0.06, 0.12, "#e8ecf4", 0, 1.12, backZ + 0.06); // chair rail
-  wall(0.12, 0.06, ROOM_D, "#e8ecf4", leftX + 0.06, 1.12, 0);
-  wall(ROOM_W, 0.2, 0.14, "#2a3350", 0, 0.1, backZ + 0.07);
-  wall(0.14, 0.2, ROOM_D, "#2a3350", leftX + 0.07, 0.1, 0);
-  wall(ROOM_W + 0.6, 0.12, 0.34, "#aab4cc", -0.3, WALL_H + 0.06, backZ - 0.15); // wall tops
-  wall(0.34, 0.12, ROOM_D, "#aab4cc", leftX - 0.15, WALL_H + 0.06, 0);
-
-  // Back wall
-  at(makeWindow(), -5.4, backZ + 0.07);
-  at(makeClock(), -3.0, backZ + 0.1, 0, 2.75);
-  at(makeSign("DUNDER MIFFBOT"), -0.2, backZ + 0.08);
-  at(makeWhiteboard(), 3.4, backZ + 0.08);
-  at(makeCorkboard(), 6.6, backZ + 0.08);
-
-  // Left wall
-  at(makePoster("TEAMWORK", "Together everyone achieves more... eventually", "#e0556b"), leftX + 0.1, -2.4, LEFT);
-  at(makePoster("HANG IN THERE", "Quarterly review is only 4 months away", "#2f7d8a"), leftX + 0.1, 2.6, LEFT);
-  at(makeBookshelf(), leftX + 0.4, -4.9, LEFT);
-  at(makeFilingCabinet(), leftX + 0.5, 4.4, LEFT);
-  at(makeFilingCabinet(), leftX + 0.5, 5.2, LEFT);
-
-  // Coffee corner
-  const coffee = at(makeCoffeeMachine(), leftX + 0.75, 0, LEFT);
-  at(makeBin(), leftX + 0.5, 1.5);
-  const steamPuffs: THREE.Mesh[] = [];
-  for (let n = 0; n < 5; n++) {
-    const puff = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.4, depthWrite: false }));
-    puff.userData.noShadow = true;
-    scene.add(puff);
-    steamPuffs.push(puff);
-  }
-
-  // Along the back wall
-  at(makePrinter(), -1.8, backZ + 0.7);
-  at(makePlant("tall"), leftX + 0.7, backZ + 0.7);
-  at(makeWaterCooler(), 6.2, backZ + 0.7);
-  at(makeFilingCabinet(), 4.9, backZ + 0.5);
-  at(makeBin(), -3.2, backZ + 0.5);
-
-  // Lounge on the open right side
-  at(makeCouch(), ROOM_W / 2 - 0.9, 0, -Math.PI / 2);
-  at(makeFloorLamp(), ROOM_W / 2 - 0.6, -2.3);
-  at(makeSideTable(), ROOM_W / 2 - 0.7, 2.3);
-  at(makePlant("tall"), ROOM_W / 2 - 0.6, backZ + 0.8);
-  at(makePlant("fern"), leftX + 0.7, ROOM_D / 2 - 0.8);
-  at(makePlant("fern"), ROOM_W / 2 - 0.6, ROOM_D / 2 - 0.8);
-
-  // Rugs: a runner down the aisle and a round-cornered mat by the couch
-  at(makeRug(14.4, 1.7, "#2f5d62", "#e8e2d0"), 0.2, 0);
-  at(makeRug(2.6, 3.4, "#6b3f4f", "#e8b04a"), ROOM_W / 2 - 2.0, 0);
-
-  return (time) => {
-    steamPuffs.forEach((puff, n) => {
-      const t = (time * 0.35 + n / steamPuffs.length) % 1;
-      puff.position.set(coffee.position.x + 0.35 + Math.sin(time + n) * 0.03, 1.25 + t * 0.9, 0.3 + Math.cos(time * 0.8 + n) * 0.03);
-      puff.scale.setScalar(0.6 + t * 1.6);
-      (puff.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - t);
-    });
+  return {
+    select,
+    setMode,
+    get mode() {
+      return rig.mode;
+    },
   };
 }

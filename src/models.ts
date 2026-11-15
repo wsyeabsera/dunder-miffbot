@@ -1,5 +1,6 @@
 // Models built from Three.js primitives: no external files, no textures (a few canvas drawings aside).
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Look } from "./state.ts";
 
 const mat = (color: string, extra: THREE.MeshStandardMaterialParameters = {}) =>
@@ -36,6 +37,43 @@ function capsule(r: number, len: number, color: string, x = 0, y = 0, z = 0): TH
   const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 12), mat(color));
   m.position.set(x, y, z);
   return m;
+}
+
+/** Identity of a plain material, or null when it has a texture and must stay on its own. */
+export function materialKey(m: THREE.MeshStandardMaterial): string | null {
+  if (m.map || m.emissiveMap) return null;
+  return [m.color.getHexString(), m.emissive.getHexString(), m.emissiveIntensity, m.roughness, m.metalness, m.opacity, m.transparent].join("|");
+}
+
+/** Within each moving part (a group with its own joint), merge the plain meshes into one mesh per material. Keeps limbs free to swing
+ *  while cutting a character from ~45 draw calls to ~20. Meshes with children or `userData.keep` (the eyes) are left alone. */
+function mergeRigid(root: THREE.Object3D) {
+  const parts: THREE.Object3D[] = [];
+  root.traverse((o) => {
+    if (o instanceof THREE.Group) parts.push(o);
+  });
+  for (const part of parts) {
+    const buckets = new Map<string, { material: THREE.Material; geos: THREE.BufferGeometry[] }>();
+    const doomed: THREE.Mesh[] = [];
+    for (const child of part.children) {
+      if (!(child instanceof THREE.Mesh) || child.children.length || child.userData.keep) continue;
+      const key = materialKey(child.material as THREE.MeshStandardMaterial);
+      if (key === null) continue;
+      child.updateMatrix();
+      const geo = child.geometry.clone().applyMatrix4(child.matrix);
+      let b = buckets.get(key);
+      if (!b) buckets.set(key, (b = { material: child.material as THREE.Material, geos: [] }));
+      b.geos.push(geo.index ? geo.toNonIndexed() : geo);
+      doomed.push(child);
+    }
+    if (doomed.length < 2) continue;
+    for (const m of doomed) part.remove(m);
+    for (const { material, geos } of buckets.values()) {
+      const merged = mergeGeometries(geos, false);
+      for (const g of geos) g.dispose();
+      if (merged) part.add(new THREE.Mesh(merged, material));
+    }
+  }
 }
 
 // ---------------------------------------------------------------- people
@@ -171,6 +209,8 @@ export function makeCharacter(look: Look): Character {
   const l = arm(-0.42);
   const r = arm(0.42);
 
+  for (const eye of eyes) eye.userData.keep = true;
+  mergeRigid(group);
   return { group, body, head, leftArm: l.shoulder, rightArm: r.shoulder, leftForearm: l.elbow, rightForearm: r.elbow, leftLeg, rightLeg, eyes };
 }
 
@@ -588,4 +628,143 @@ export function makeLabel(text: string, color = "#ffffff"): THREE.Sprite {
   sprite.scale.set(2.4, 0.6, 1);
   sprite.renderOrder = 10;
   return sprite;
+}
+
+// ---------------------------------------------------------------- the big office: kitchen, lounge, server room, restrooms
+
+export function makeCounter(w = 3.6): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(w, 0.9, 0.7, "#8a6a4a", 0, 0.45, 0));
+  g.add(box(w + 0.05, 0.05, 0.78, "#e8e2d0", 0, 0.925, 0));
+  for (let x = -w / 2 + 0.6; x < w / 2; x += 1.2) g.add(box(0.02, 0.7, 0.02, "#6a4a2a", x, 0.45, 0.36));
+  g.add(box(0.7, 0.04, 0.45, "#7a828e", w / 4, 0.955, 0)); // sink
+  g.add(box(0.04, 0.3, 0.04, "#aab2c0", w / 4, 1.1, -0.2));
+  g.add(box(0.04, 0.04, 0.2, "#aab2c0", w / 4, 1.25, -0.12));
+  g.add(box(0.5, 0.08, 0.3, "#c0392b", -w / 4, 0.99, 0)); // a tray of something
+  return g;
+}
+
+export function makeFridge(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(0.9, 1.9, 0.8, "#dfe3ea", 0, 0.95, 0));
+  g.add(box(0.9, 0.02, 0.01, "#9aa3b2", 0, 1.35, 0.4));
+  g.add(box(0.04, 0.4, 0.04, "#9aa3b2", 0.32, 1.7, 0.43));
+  g.add(box(0.04, 0.6, 0.04, "#9aa3b2", 0.32, 0.85, 0.43));
+  g.add(box(0.28, 0.2, 0.01, "#ffe27a", -0.2, 1.65, 0.41)); // a note
+  return g;
+}
+
+export function makeVending(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(1.0, 1.9, 0.9, "#b8473f", 0, 0.95, 0));
+  put(g, box(0.7, 1.3, 0.02, "#1a2430", -0.1, 1.1, 0.46)).material = glow("#9fd4ff", 0.5);
+  const colors = ["#e0556b", "#e8b04a", "#4aa3df", "#3f9b4a", "#7a5aa8"];
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 4; c++) g.add(box(0.12, 0.16, 0.03, colors[(r + c) % colors.length], -0.35 + c * 0.17, 1.55 - r * 0.25, 0.47));
+  g.add(box(0.18, 0.5, 0.02, "#2a2a30", 0.37, 1.2, 0.46));
+  g.add(box(0.7, 0.2, 0.02, "#2a2a30", -0.1, 0.3, 0.46));
+  return g;
+}
+
+export function makeTable(w = 1.6, d = 1.6): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(w, 0.08, d, "#c9954f", 0, 0.76, 0));
+  g.add(box(w + 0.04, 0.03, d + 0.04, "#a87a3a", 0, 0.71, 0));
+  for (const x of [-1, 1]) for (const z of [-1, 1]) g.add(box(0.07, 0.72, 0.07, "#7a5528", x * (w / 2 - 0.1), 0.36, z * (d / 2 - 0.1)));
+  g.add(cyl(0.07, 0.06, 0.1, "#f4f4f6", w * 0.15, 0.85, d * 0.1, 12)); // a mug
+  g.add(box(0.28, 0.02, 0.36, "#f4f4ee", -w * 0.2, 0.81, -d * 0.1));
+  return g;
+}
+
+export function makeTV(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(2.2, 0.5, 0.45, "#4a3a2a", 0, 0.25, 0));
+  g.add(box(2.0, 0.04, 0.5, "#6a5a4a", 0, 0.52, 0));
+  g.add(box(0.5, 0.2, 0.1, "#2a2a30", 0, 0.62, 0));
+  g.add(box(1.9, 1.1, 0.07, "#14161c", 0, 1.25, 0));
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.0), glow("#7aa2ff", 0.8));
+  screen.position.set(0, 1.25, 0.04);
+  g.add(screen);
+  for (let i = 0; i < 6; i++) g.add(box(0.28, 0.5 + (i % 3) * 0.12, 0.005, ["#e0556b", "#e8b04a", "#3f9b4a", "#4aa3df", "#7a5aa8", "#ffffff"][i], -0.75 + i * 0.3, 1.05 + (i % 3) * 0.06, 0.045));
+  return g;
+}
+
+export function makePingPong(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(2.7, 0.06, 1.5, "#2f6b4a", 0, 0.76, 0));
+  g.add(box(2.7, 0.01, 0.03, "#ffffff", 0, 0.795, 0));
+  g.add(box(0.03, 0.01, 1.5, "#ffffff", 0, 0.795, 0));
+  g.add(box(0.02, 0.15, 1.6, "#e8ecf4", 0, 0.88, 0));
+  for (const x of [-1, 1]) for (const z of [-1, 1]) g.add(box(0.08, 0.74, 0.08, "#2a2a3a", x * 1.2, 0.37, z * 0.6));
+  g.add(ball(0.025, "#ffffff", 0.5, 0.82, 0.2));
+  return g;
+}
+
+export function makeRack(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(0.8, 2.0, 1.0, "#22262e", 0, 1.0, 0));
+  g.add(box(0.7, 1.8, 0.02, "#14161c", 0, 1.0, 0.51));
+  for (let r = 0; r < 9; r++) {
+    g.add(box(0.6, 0.12, 0.02, "#2e343f", 0, 0.3 + r * 0.19, 0.52));
+    const color = ["#3fe07a", "#4aa3df", "#ffb03a"][r % 3];
+    for (let l = 0; l < 4; l++) put(g, box(0.04, 0.04, 0.02, color, -0.2 + l * 0.08 + (r % 2) * 0.12, 0.3 + r * 0.19, 0.535)).material = glow(color, 1.2);
+  }
+  return g;
+}
+
+export function makeBench(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(1.8, 0.08, 0.6, "#b5895a", 0, 0.5, 0));
+  put(g, box(1.8, 0.5, 0.06, "#b5895a", 0, 0.8, -0.28)).rotation.x = -0.12;
+  for (const x of [-0.8, 0.8]) g.add(box(0.08, 0.5, 0.55, "#4a3a2a", x, 0.25, 0));
+  return g;
+}
+
+export function makeStall(): THREE.Group {
+  const g = new THREE.Group();
+  const wall = "#c8d4d8";
+  g.add(box(0.05, 1.7, 1.6, wall, -0.55, 0.95, 0));
+  g.add(box(0.05, 1.7, 1.6, wall, 0.55, 0.95, 0));
+  g.add(box(1.1, 1.7, 0.05, wall, 0, 0.95, -0.8));
+  g.add(box(0.5, 0.35, 0.45, "#f4f4f6", 0, 0.28, -0.45));
+  g.add(cyl(0.2, 0.18, 0.22, "#f4f4f6", 0, 0.42, -0.3, 16));
+  g.add(box(0.5, 1.4, 0.04, "#8aa0a8", 0, 0.85, 0.8));
+  return g;
+}
+
+export function makeSink(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(1.2, 0.8, 0.55, "#c8d4d8", 0, 0.4, 0));
+  g.add(box(1.25, 0.05, 0.6, "#f4f4f6", 0, 0.83, 0));
+  g.add(box(0.5, 0.04, 0.35, "#9aa3b2", -0.2, 0.86, 0.02));
+  g.add(box(0.04, 0.25, 0.04, "#aab2c0", -0.2, 1.0, -0.15));
+  return g;
+}
+
+export function makeLogoRug(w: number, d: number, text: string, color: string, border: string): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(w, 0.03, d, border, 0, 0.015, 0));
+  const c = document.createElement("canvas");
+  c.width = 768;
+  c.height = Math.round((768 * (d - 0.3)) / (w - 0.3));
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, c.width, c.height);
+  fitFont(ctx, text, 120, c.width * 0.86);
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, c.width / 2, c.height / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.3, d - 0.3), new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }));
+  top.rotation.x = -Math.PI / 2;
+  top.position.y = 0.036;
+  g.add(top);
+  return g;
+}
+
+export function makeManagerDesk(): THREE.Group {
+  const g = makeDesk();
+  g.scale.set(1.45, 1.1, 1.4);
+  return g;
 }

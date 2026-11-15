@@ -25,6 +25,8 @@ export type Employee = {
   personality: string;
   log: { at: string; text: string }[];
   memory: string[];
+  /** A fixed workplace instead of a desk in the open-plan floor. */
+  post?: "reception";
 };
 
 /** Seconds of work one allowance point costs, and seconds a task takes. */
@@ -58,6 +60,7 @@ export const employees: Employee[] = [
     look: { shirt: "#58b36c", pants: "#3a3347", shoes: "#e8e2d0", hair: "#2a1a14", skin: "#b9784a", hairStyle: "bun", height: 0.93, build: 0.98, accessory: "lanyard" },
     status: "idle",
     allowance: { used: 0, total: 20 },
+    post: "reception",
     personality: "Placeholder: cheerful, always organising something.",
     log: [{ at: "09:10", text: "Arrived. Brought snacks." }],
     memory: ["Knows where everything is."],
@@ -73,6 +76,50 @@ export const employees: Employee[] = [
     memory: ["Prefers the old process."],
   },
 ];
+
+// ---- Placeholder employees: a seeded generator, so the same office appears every time. Real employees come from slice 1.
+const FIRST = ["Aaron", "Beth", "Carlos", "Dana", "Eddie", "Fiona", "Greg", "Hana", "Ivan", "Jess", "Kofi", "Lena", "Marco", "Nia", "Omar", "Pia", "Quinn", "Raj", "Sam", "Tess", "Uma", "Vic", "Wren", "Xan", "Yuki", "Zed"];
+const LAST = ["Bumble", "Crumb", "Dally", "Fennel", "Gribble", "Hobbs", "Inkwell", "Jargon", "Kettle", "Lumley", "Muddle", "Nettle", "Pickle", "Quibble", "Rumple", "Spindle", "Tumble", "Umber", "Vexley", "Waddle", "Yarrow", "Zimmer", "Ashby", "Brindle", "Crumpet", "Dobbin"];
+const SHIRTS = ["#e0556b", "#4aa3df", "#58b36c", "#e8b04a", "#7a5aa8", "#e8e2d0", "#2f7d8a", "#d1743f", "#8aa0c8", "#b86a9a", "#5c7a4a", "#c9c2b0"];
+const PANTS = ["#2f3350", "#262b3a", "#3a3347", "#4a4a55", "#5a4a3a", "#2a3a4a"];
+const SKINS = ["#f2c48d", "#d9a066", "#b9784a", "#e8b48a", "#8a5a3a", "#f6d3b0", "#a06a42"];
+const HAIRS = ["#5a3a22", "#1f1f2e", "#2a1a14", "#999999", "#c9a14a", "#8a3a22", "#3a2a1a"];
+const STYLES: Look["hairStyle"][] = ["short", "bob", "bun", "curly", "bald", "short", "bob"];
+const ACCESSORIES: Look["accessory"][] = ["glasses", "tie", "lanyard", "cardigan", "mustache", "none", "none", "none"];
+const QUIRKS = ["Always microwaves fish.", "Talks to the plant.", "Has opinions about fonts.", "Keeps a spreadsheet of lunches.", "Never closes a tab.", "Says 'per my last email' out loud.", "Sharpens pencils nervously.", "Believes in the four-day week."];
+
+function seeded(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Add generated placeholder employees until there are `total` of them. */
+export function fillOffice(total: number) {
+  const rnd = seeded(20261115);
+  const pick = <T,>(list: T[]) => list[Math.floor(rnd() * list.length)];
+  for (let i = employees.length; i < total; i++) {
+    const name = `${FIRST[i % FIRST.length]} ${LAST[(i * 7) % LAST.length]}`;
+    employees.push({
+      id: `emp${i}`,
+      name,
+      look: {
+        shirt: pick(SHIRTS), pants: pick(PANTS), shoes: pick(["#2a1a14", "#14161c", "#e8e2d0", "#5a3a22"]), hair: pick(HAIRS), skin: pick(SKINS),
+        hairStyle: pick(STYLES), accessory: pick(ACCESSORIES), height: 0.92 + rnd() * 0.16, build: 0.9 + rnd() * 0.26,
+      },
+      status: "idle",
+      allowance: { used: Math.floor(rnd() * 8), total: 20 },
+      personality: `Placeholder. ${pick(QUIRKS)}`,
+      log: [{ at: "09:00", text: "Arrived." }],
+      memory: [],
+    });
+  }
+}
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -158,4 +205,22 @@ export function tick(dt: number) {
     }
   }
   if (any) changed();
+}
+
+const TASKS = ["Reconcile the stapler inventory", "Draft a memo about memos", "Prepare the quarterly synergy deck", "Reply-all to everyone", "Defrag the shared drive", "Update the org chart (again)", "Review the review of the review", "Write the minutes of the meeting about meetings"];
+let stirClock = 0;
+
+/** Start the day with about half the office at work. */
+export function seedActivity() {
+  const rnd = seeded(7);
+  for (const e of employees) if (rnd() < 0.5) giveTask(e.id, TASKS[Math.floor(rnd() * TASKS.length)]);
+}
+
+/** Fake manager: every few seconds hands a task to a random idle employee, so people keep cycling between desk and break. */
+export function stir(dt: number) {
+  stirClock += dt;
+  if (stirClock < 4) return;
+  stirClock = 0;
+  const idle = employees.filter((e) => e.status === "idle");
+  if (idle.length > 3) giveTask(idle[Math.floor(Math.random() * idle.length)].id, TASKS[Math.floor(Math.random() * TASKS.length)]);
 }
