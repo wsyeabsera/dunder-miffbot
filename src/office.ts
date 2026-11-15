@@ -63,7 +63,16 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   };
   const world = buildWorld(level);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // Experiment (task #2540): add ?webgpu to the address to draw with three.js's WebGPU renderer instead of WebGL.
+  let renderer: THREE.WebGLRenderer;
+  if (new URLSearchParams(location.search).has("webgpu")) {
+    const { WebGPURenderer } = await import("three/webgpu");
+    const gpu = new WebGPURenderer({ canvas, antialias: true });
+    await gpu.init();
+    renderer = gpu as unknown as THREE.WebGLRenderer;
+  } else {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  }
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
