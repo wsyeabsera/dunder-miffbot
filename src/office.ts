@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { employees, type Employee, type Status } from "./state.ts";
-import { makeCharacter, makeLabel, makeMug, type Character } from "./models.ts";
+import { makeLabel } from "./models.ts";
+import { createActor, lookToActor, type Actor, type Kit } from "./actors.ts";
 import { CameraRig, type Mode, type Subject } from "./camera-rig.ts";
 import { buildLevel, type Activity, type Spot } from "./world/level.ts";
 import { buildWorld } from "./world/build.ts";
@@ -18,12 +19,13 @@ const BREAKS: { activity: Activity; weight: number; stay: [number, number] }[] =
   { activity: "library", weight: 1, stay: [6, 12] },
   { activity: "wander", weight: 1.5, stay: [4, 8] },
 ];
-const SIT_LIFT = { chair: 0.03, soft: -0.12 };
+/** How far to raise a seated person so they sit on the seat: the sitting clip is made for a low seat. Tuned by eye. */
+const SIT_LIFT = { chair: 0.2, soft: 0.0 };
 const WALL_LOW = 0.38;
 
 type Agent = {
   e: Employee;
-  ch: Character;
+  actor: Actor;
   seat: Spot;
   spot: Spot; // where they are, or are heading
   path: Pt[];
@@ -33,11 +35,12 @@ type Agent = {
   phase: number;
   speed: number;
   heading: number;
+  lift: number; // current height offset from sitting
+  variant: number; // picks between similar clips so neighbours do not move in sync
   marker: THREE.Mesh;
   zzz: THREE.Sprite;
   name: THREE.Sprite;
-  mug: THREE.Group;
-  nextBlink: number;
+  clip: string;
 };
 
 export type Office = {
@@ -50,7 +53,7 @@ type Hooks = { onSelect(id: string | null): void; onMode(mode: Mode): void; fade
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
-export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, hooks: Hooks): Office {
+export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, hooks: Hooks, kit: Kit): Office {
   const level = buildLevel();
   const world = buildWorld(level);
 
@@ -90,40 +93,34 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
 
   const agents: Agent[] = employees.slice(0, level.seats.length).map((e, i) => {
     const seat = e.post === "reception" ? reception : spread(nextDesk++);
-    const ch = makeCharacter(e.look);
-    ch.group.traverse((o) => (o.userData.employeeId = e.id));
+    const actor = createActor(kit, lookToActor(e.look, i));
+    const g = actor.group;
     const name = makeLabel(e.name);
-    name.position.set(0, 2.85, 0);
+    name.position.set(0, 2.3, 0);
     name.scale.set(2.2, 0.55, 1);
     name.visible = false;
-    ch.group.add(name);
+    g.add(name);
     const marker = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), new THREE.MeshBasicMaterial({ color: STATUS_COLOR[e.status], depthTest: false }));
-    marker.position.set(0, 2.5, 0);
+    marker.position.set(0, 2.0, 0);
     marker.renderOrder = 10;
     marker.userData.noShadow = true;
-    ch.group.add(marker);
+    g.add(marker);
     const zzz = makeLabel("Zzz", "#cbd5e1");
-    zzz.position.set(0.5, 2.4, 0);
+    zzz.position.set(0.5, 1.95, 0);
     zzz.scale.set(1.0, 0.25, 1);
     zzz.visible = false;
-    ch.group.add(zzz);
-    const mug = makeMug(i % 2 ? "#e0556b" : "#f4f4f6");
-    mug.position.set(0.02, -0.4, 0.06);
-    mug.rotation.y = Math.PI / 2;
-    mug.visible = false;
-    ch.rightForearm.add(mug);
-    ch.group.position.set(seat.x, 0, seat.z);
-    ch.group.rotation.y = seat.face;
-    ch.group.traverse((o) => {
-      if (o instanceof THREE.Mesh && !o.userData.noShadow) {
-        o.castShadow = true;
-        o.receiveShadow = true;
-      }
-    });
-    scene.add(ch.group);
+    g.add(zzz);
+    // Clicking is tested against one invisible box per person, not their 20k-triangle skinned meshes.
+    const proxy = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.9, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
+    proxy.position.y = 0.95;
+    proxy.userData.employeeId = e.id;
+    g.add(proxy);
+    g.position.set(seat.x, 0, seat.z);
+    g.rotation.y = seat.face;
+    scene.add(g);
     return {
-      e, ch, seat, spot: seat, path: [], walking: false, stay: rand(1, 14), sit: 1, phase: i * 1.7, speed: rand(1.25, 1.75),
-      heading: seat.face, marker, zzz, name, mug, nextBlink: 2 + (i % 5),
+      e, actor, seat, spot: seat, path: [], walking: false, stay: rand(1, 14), sit: 1, phase: i * 1.7, speed: rand(1.25, 1.75),
+      heading: seat.face, lift: SIT_LIFT.chair, variant: i, marker, zzz, name, clip: "",
     } satisfies Agent;
   });
 
@@ -132,7 +129,7 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   for (const a of agents) holder.set(a.seat.id, a);
 
   const route = (a: Agent, to: Spot): Pt[] => {
-    const pos = a.ch.group.position;
+    const pos = a.actor.group.position;
     const pts: Pt[] = [];
     let start: Pt = { x: pos.x, z: pos.z };
     if (!a.walking && Math.hypot(pos.x - a.spot.x, pos.z - a.spot.z) < 0.3) {
@@ -190,7 +187,7 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
   const soft = (a: Agent) => a.spot.pose === "sitSoft";
 
   function move(a: Agent, dt: number) {
-    const g = a.ch.group;
+    const g = a.actor.group;
     if (a.walking) {
       const next = a.path[0];
       const dx = next.x - g.position.x;
@@ -211,8 +208,8 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
         // Keep a little distance from people who are standing or walking nearby
         for (const o of agents) {
           if (o === a || o.sit > 0.5) continue;
-          const ox = g.position.x - o.ch.group.position.x;
-          const oz = g.position.z - o.ch.group.position.z;
+          const ox = g.position.x - o.actor.group.position.x;
+          const oz = g.position.z - o.actor.group.position.z;
           const d = Math.hypot(ox, oz);
           if (d < 0.7 && d > 0.001) {
             mx += (ox / d) * (0.7 - d) * dt * 2;
@@ -235,97 +232,53 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
     g.rotation.y += dh * clamp01(dt * 10);
   }
 
-  function pose(a: Agent, dt: number, time: number, hidden: boolean) {
-    const { ch } = a;
-    const g = ch.group;
+  const STAND = ["Idle_Loop", "Idle_FoldArms_Loop", "Idle_Talking_Loop"];
+  const SIT = ["Sitting_Idle_Loop", "Sitting_Talking_Loop"];
+
+  /** The animation clip for what this person is doing right now. */
+  function clipFor(a: Agent): string {
+    if (a.walking) return "Walk_Formal_Loop";
+    const p = a.spot.pose;
+    if (p === "desk") return a.e.status === "idle" && a.variant % 3 === 0 ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop";
+    if (p === "sip") return "Consume";
+    if (p === "sit") return SIT[a.variant % 2];
+    if (p === "sitSoft") return a.variant % 2 ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop";
+    if (a.spot.activity === "wander" && a.variant % 2 === 0) return "Idle_TalkingPhone_Loop";
+    return STAND[a.variant % STAND.length];
+  }
+
+  function pose(a: Agent, dt: number, hidden: boolean) {
+    const g = a.actor.group;
     const seated = !a.walking && ["desk", "sit", "sitSoft"].includes(a.spot.pose);
     a.sit = approach(a.sit, seated ? 1 : 0, dt * 6);
-    g.position.y = (soft(a) ? SIT_LIFT.soft : SIT_LIFT.chair) * a.sit;
+    const wantLift = (soft(a) ? SIT_LIFT.soft : SIT_LIFT.chair) * a.sit;
+    a.lift = approach(a.lift, wantLift, dt * 8);
+    g.position.y = a.lift;
 
-    const k = dt * 12;
-    let armL = 0, armR = 0, foreL = -0.15, foreR = -0.15, legL = 0, legR = 0, head = 0, turn = 0, bob = 0;
-    const p = a.spot.pose;
-    const here = !a.walking;
-    if (a.walking) {
-      const s = Math.sin(a.phase);
-      armL = s * 0.7; armR = -s * 0.7; foreL = -0.25 - Math.max(0, -s) * 0.3; foreR = -0.25 - Math.max(0, s) * 0.3;
-      legL = -s * 0.6; legR = s * 0.6;
-      bob = Math.abs(Math.cos(a.phase)) * 0.06;
-    } else if (p === "desk") {
-      if (a.e.status === "working") {
-        armL = -0.5; armR = -0.5;
-        foreL = -0.95 + Math.sin(time * 14 + a.phase) * 0.12;
-        foreR = -0.95 + Math.sin(time * 14 + a.phase + Math.PI) * 0.12;
-        head = 0.1 + Math.sin(time * 1.7 + a.phase) * 0.04;
-        turn = Math.sin(time * 0.6 + a.phase * 2) * 0.12;
-      } else if (a.e.status === "resting") {
-        armL = -0.3; armR = -0.3; foreL = -0.8; foreR = -0.8; head = 0.95;
-        bob = Math.sin(time * 1.5 + a.phase) * 0.015;
-      } else {
-        armL = -0.4; armR = -0.4; foreL = -0.7; foreR = -0.7; head = 0.05;
-        turn = Math.sin(time * 0.5 + a.phase) * 0.35;
-      }
-    } else if (here && p === "sip") {
-      const sip = Math.max(0, Math.sin(time * 0.9 + a.phase));
-      armR = -0.55 - sip * 0.2; foreR = -1.2 - sip * 0.8;
-      head = -0.1 - sip * 0.15;
-      turn = (1 - sip) * Math.sin(time * 0.5 + a.phase) * 0.3;
-    } else if (here && p === "sit") {
-      armL = -0.4; armR = -0.5; foreL = -0.8;
-      foreR = -1.0 - Math.max(0, Math.sin(time * 1.1 + a.phase)) * 0.8;
-      head = 0.1;
-      turn = Math.sin(time * 0.4 + a.phase) * 0.3;
-    } else if (here && p === "sitSoft") {
-      armL = -0.35; armR = -0.35; foreL = -0.9; foreR = -0.9;
-      head = 0.05;
-      turn = Math.sin(time * 0.4 + a.phase) * 0.25;
-    } else if (here && a.spot.activity === "print") {
-      armL = -0.5; armR = -0.5; foreL = -0.8 + Math.sin(time * 2 + a.phase) * 0.05; foreR = -0.8;
-      head = 0.15;
-    } else if (here && a.spot.activity === "library") {
-      armL = -0.7; armR = -0.7; foreL = -1.2; foreR = -1.2;
-      head = 0.3;
-      turn = Math.sin(time * 0.5 + a.phase) * 0.2;
-    } else {
-      turn = Math.sin(time * 0.45 + a.phase) * 0.5;
+    const clip = clipFor(a);
+    if (clip !== a.clip) {
+      a.clip = clip;
+      a.actor.play(clip, 0.3);
     }
-    const legSit = (-Math.PI / 2) * a.sit;
-    ch.leftArm.rotation.x = approach(ch.leftArm.rotation.x, armL, k);
-    ch.rightArm.rotation.x = approach(ch.rightArm.rotation.x, armR, k);
-    ch.leftForearm.rotation.x = approach(ch.leftForearm.rotation.x, foreL, k);
-    ch.rightForearm.rotation.x = approach(ch.rightForearm.rotation.x, foreR, k);
-    ch.leftLeg.rotation.x = approach(ch.leftLeg.rotation.x, legSit + legL, k);
-    ch.rightLeg.rotation.x = approach(ch.rightLeg.rotation.x, legSit + legR, k);
-    ch.head.rotation.x = approach(ch.head.rotation.x, head, k);
-    ch.head.rotation.y = approach(ch.head.rotation.y, turn, dt * 6);
-    ch.body.position.y = approach(ch.body.position.y, bob, k);
-    a.mug.visible = here && (p === "sip" || (p === "sit" && a.spot.activity === "lunch"));
+    a.actor.update(dt * (a.walking ? Math.max(0.6, a.speed / 1.5) : 1));
 
-    // Blink, and shut the eyes when resting
-    const resting = a.e.status === "resting" && p === "desk" && here;
-    let closed = resting;
-    if (time > a.nextBlink) {
-      const t = time - a.nextBlink;
-      closed = closed || t < 0.12;
-      if (t >= 0.12) a.nextBlink = time + 2.5 + Math.random() * 3;
-    }
-    for (const eye of ch.eyes) eye.scale.y = closed ? 0.1 : 1.1;
-
+    const resting = a.e.status === "resting" && a.spot.pose === "desk" && !a.walking;
     (a.marker.material as THREE.MeshBasicMaterial).color.set(STATUS_COLOR[a.e.status]);
     a.zzz.visible = resting && !hidden;
-    if (a.zzz.visible) a.zzz.position.y = 2.4 + ((time * 0.5) % 1) * 0.3;
+    if (a.zzz.visible) a.zzz.position.y = 1.95 + ((performance.now() / 2000) % 1) * 0.3;
   }
 
   // ---- Camera and picking
   let selected: string | null = null;
   let hovered: string | null = null;
-  const pickables: THREE.Object3D[] = [...agents.map((a) => a.ch.group), ...world.deskProxies];
+  const pickables: THREE.Object3D[] = [...agents.map((a) => a.actor.group.children.find((c) => c.userData.employeeId)!), ...world.deskProxies];
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const subject: Subject = { position: new THREE.Vector3(), heading: 0, eye: new THREE.Vector3(), pitch: 0, turn: 0 };
 
   const rig = new CameraRig(canvas, {
     fade: hooks.fade,
+    blocked: (x, z) => level.walls.solidAt(x, z),
     onMode: (m) => hooks.onMode(m),
     onTap: (ev) => {
       const id = pick(ev);
@@ -390,21 +343,24 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
       decide(a, dt);
       move(a, dt);
       const inPov = rig.mode === "pov" && a === focus;
-      pose(a, dt, time, inPov);
-      a.ch.head.visible = !inPov;
+      pose(a, dt, inPov);
       a.marker.visible = !inPov;
       a.name.visible = !inPov && (a.e.id === selected || a.e.id === hovered);
     }
 
     if (focus) {
-      focus.ch.group.updateMatrixWorld(true);
-      eye.set(0, 0.26, 0.2);
-      focus.ch.head.localToWorld(eye);
-      subject.position.copy(focus.ch.group.position);
-      subject.heading = focus.ch.group.rotation.y;
+      // Eyes: the head bone, moved a little forward and up so the camera sits in front of the face, not inside the skull.
+      focus.actor.group.updateMatrixWorld(true);
+      focus.actor.head.getWorldPosition(eye);
+      const h = focus.actor.group.rotation.y;
+      eye.x += Math.sin(h) * 0.17;
+      eye.z += Math.cos(h) * 0.17;
+      eye.y += 0.1;
+      subject.position.copy(focus.actor.group.position);
+      subject.heading = h;
       subject.eye.copy(eye);
-      subject.pitch = focus.ch.head.rotation.x;
-      subject.turn = focus.ch.head.rotation.y;
+      subject.pitch = 0;
+      subject.turn = 0;
     }
     rig.update(dt, focus ? subject : null);
 
@@ -425,7 +381,7 @@ export function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, 
 
     const sel = agents.find((a) => a.e.id === selected);
     ring.visible = sel !== undefined && rig.mode !== "pov";
-    if (sel) ring.position.set(sel.ch.group.position.x, 0.04, sel.ch.group.position.z);
+    if (sel) ring.position.set(sel.actor.group.position.x, 0.04, sel.actor.group.position.z);
     renderer.render(scene, rig.camera);
   });
 

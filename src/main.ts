@@ -2,6 +2,7 @@ import "./style.css";
 import { createOffice } from "./office.ts";
 import { createPanel } from "./panel.ts";
 import { fillOffice, seedActivity, stir, tick } from "./state.ts";
+import { loadKit } from "./actors.ts";
 import type { Mode } from "./camera-rig.ts";
 
 // 30 placeholder employees until the backend (slice 1) supplies real ones.
@@ -13,11 +14,14 @@ const stage = document.querySelector<HTMLElement>("#stage")!;
 const buttons = [...document.querySelectorAll<HTMLButtonElement>("#modes button")];
 
 const panel = createPanel(document.querySelector<HTMLElement>("#panel")!, () => select(null));
+const loading = document.querySelector<HTMLElement>("#loading");
+const kit = await loadKit(); // the characters and their animations: tens of megabytes, so the office waits for them
+loading?.remove();
 const office = createOffice(canvas, stage, {
   onSelect: (id) => select(id),
   onMode: (mode) => showMode(mode),
   fade: document.querySelector<HTMLElement>("#fade") ?? undefined,
-});
+}, kit);
 
 function select(id: string | null) {
   office.select(id);

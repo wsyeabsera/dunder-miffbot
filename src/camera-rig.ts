@@ -23,6 +23,8 @@ type Hooks = {
   onTap(ev: PointerEvent): void;
   onHover(ev: PointerEvent): void;
   onMode(mode: Mode): void;
+  /** True when a point on the floor is inside a wall or furniture, so the follow camera can stay out of it. */
+  blocked(x: number, z: number): boolean;
   fade?: HTMLElement;
 };
 
@@ -175,8 +177,16 @@ export class CameraRig {
   }
 
   private updateFollow(dt: number, s: Subject) {
-    const back = new THREE.Vector3(-Math.sin(s.heading), 0, -Math.cos(s.heading)).multiplyScalar(this.followDistance);
-    const want = new THREE.Vector3(s.position.x + back.x, 2.6 + this.followDistance * 0.12, s.position.z + back.z);
+    // Behind them, but pulled in until the camera is out of any wall
+    const dir = new THREE.Vector3(-Math.sin(s.heading), 0, -Math.cos(s.heading));
+    let d = this.followDistance;
+    for (let t = 0.6; t <= d; t += 0.25) {
+      if (this.hooks.blocked(s.position.x + dir.x * t, s.position.z + dir.z * t)) {
+        d = Math.max(1.2, t - 0.6);
+        break;
+      }
+    }
+    const want = new THREE.Vector3(s.position.x + dir.x * d, 2.2 + d * 0.18, s.position.z + dir.z * d);
     if (!this.smoothReady) {
       this.smooth.copy(want);
       this.smoothReady = true;

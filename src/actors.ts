@@ -122,6 +122,8 @@ export async function loadKit(): Promise<Kit> {
 
 export type Actor = {
   group: THREE.Group;
+  /** The head bone (for the point-of-view camera). */
+  head: THREE.Bone;
   mixer: THREE.AnimationMixer;
   look: ActorLook;
   /** Cross-fade to a clip by name. */
@@ -196,6 +198,7 @@ export function createActor(kit: Kit, look: ActorLook): Actor {
   let current: THREE.AnimationAction | null = null;
   return {
     group,
+    head,
     mixer,
     look,
     play(name, fade = 0.3) {
