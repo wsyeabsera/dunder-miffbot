@@ -6,6 +6,7 @@ import { CameraRig, type Mode, type Subject } from "./camera-rig.ts";
 import { buildLevel, type Activity, type Level, type Spot } from "./world/level.ts";
 import { buildWorld } from "./world/build.ts";
 import type { Pt } from "./world/grid.ts";
+import type { Walker } from "./engine/physics.ts";
 
 const STATUS_COLOR: Record<Status, string> = { working: "#4ade80", idle: "#facc15", resting: "#94a3b8" };
 /** Chance weights and how long (seconds) someone stays, per break activity. */
@@ -66,10 +67,19 @@ const BOSS = { x: 9, z: -12, heading: 0 };
 
 export async function createOffice(canvas: HTMLCanvasElement, container: HTMLElement, hooks: Hooks, kit: Kit): Promise<Office> {
   const level = buildLevel();
-  // Physics (Rapier, WebAssembly) is loaded on demand: it is only needed for walk mode.
-  const { createPhysics } = await import("./engine/physics.ts");
-  const physics = await createPhysics(level);
-  const walker = physics.walker(BOSS.x, BOSS.z);
+  // Physics (Rapier, WebAssembly, about 4 MB) is only needed for walk mode, so it loads the first time you walk.
+  let realWalker: Walker | null = null;
+  let physicsLoading: Promise<void> | null = null;
+  const loadPhysics = () =>
+    (physicsLoading ??= import("./engine/physics.ts").then(async (m) => {
+      realWalker = (await m.createPhysics(level)).walker(BOSS.x, BOSS.z);
+    }));
+  const walker: Walker = {
+    position: () => realWalker?.position() ?? { x: BOSS.x, y: 0, z: BOSS.z },
+    move: (dx, dz) => realWalker?.move(dx, dz) ?? { x: 0, z: 0 },
+    place: (x, z) => realWalker?.place(x, z),
+    remove: () => realWalker?.remove(),
+  };
   const world = buildWorld(level);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -105,6 +115,18 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   ring.visible = false;
   ring.userData.noShadow = true;
   scene.add(ring);
+
+  // A little mood light in the main rooms: warm kitchen and offices, cool server room, pink lounge
+  const MOOD: Record<string, [string, number]> = {
+    kitchen: ["#ffe2b0", 38], manager: ["#ffcf8a", 38], server: ["#5fa0ff", 55], lounge: ["#ff9fd0", 45], lobby: ["#ffd9a8", 38], terrace: ["#ffd9a0", 30],
+  };
+  for (const r of level.rooms) {
+    const mood = MOOD[r.id];
+    if (!mood) continue;
+    const light = new THREE.PointLight(mood[0], mood[1], 13, 1.6);
+    light.position.set((r.rect.x0 + r.rect.x1) / 2, 2.9, (r.rect.z0 + r.rect.z1) / 2);
+    scene.add(light);
+  }
 
   // Room names on the floor, shown in the overhead view
   const roomLabels = new THREE.Group();
@@ -345,7 +367,8 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     return null;
   }
 
-  function setMode(mode: Mode) {
+  async function setMode(mode: Mode) {
+    if (mode === "walk") await loadPhysics();
     if ((mode === "follow" || mode === "pov") && !selected) hooks.onSelect(agents[0].e.id);
     rig.setMode(mode);
   }
