@@ -7,7 +7,13 @@
     <title>Dunder Miffbot</title>
   </head>
   <body>
-    <canvas id="office"></canvas>
+    <main id="stage">
+      <canvas id="office"></canvas>
+      <h1 class="title">Dunder Miffbot</h1>
+      <p class="hint">Click an employee to see their day.</p>
+      <button id="signout" class="signout" hidden>Sign out</button>
+    </main>
+    <aside id="panel" hidden></aside>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

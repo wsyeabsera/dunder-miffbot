@@ -1,37 +1,33 @@
-import * as THREE from "three";
 import "./style.css";
+import { createOffice } from "./office.ts";
+import { createPanel } from "./panel.ts";
+import { tick } from "./state.ts";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#office")!;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-const scene = new THREE.Scene();
-scene.background = new THREE.Color("#1d2433");
+const stage = document.querySelector<HTMLElement>("#stage")!;
 
-// Fixed isometric view: orthographic camera at 45° around, looking down.
-const VIEW_HEIGHT = 12;
-const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-camera.position.set(10, 10, 10);
-camera.lookAt(0, 0, 0);
+const panel = createPanel(document.querySelector<HTMLElement>("#panel")!, () => select(null));
+const office = createOffice(canvas, stage, (id) => select(id));
 
-scene.add(new THREE.AmbientLight("#ffffff", 0.7));
-const sun = new THREE.DirectionalLight("#ffffff", 1.2);
-sun.position.set(5, 10, 3);
-scene.add(sun);
-
-const floor = new THREE.Mesh(new THREE.BoxGeometry(10, 0.2, 10), new THREE.MeshStandardMaterial({ color: "#3a4a6b" }));
-floor.position.y = -0.1;
-scene.add(floor);
-
-function resize() {
-  const aspect = window.innerWidth / window.innerHeight;
-  camera.left = (-VIEW_HEIGHT * aspect) / 2;
-  camera.right = (VIEW_HEIGHT * aspect) / 2;
-  camera.top = VIEW_HEIGHT / 2;
-  camera.bottom = -VIEW_HEIGHT / 2;
-  camera.updateProjectionMatrix();
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+function select(id: string | null) {
+  office.select(id);
+  panel.show(id);
 }
-window.addEventListener("resize", resize);
-resize();
 
-renderer.setAnimationLoop(() => renderer.render(scene, camera));
+// Sign out exists only where the Worker (and so a session) does; the local dev server has neither.
+if (import.meta.env.PROD) {
+  const signout = document.querySelector<HTMLButtonElement>("#signout")!;
+  signout.hidden = false;
+  signout.onclick = async () => {
+    await fetch("/logout", { method: "POST" });
+    location.replace("/login");
+  };
+}
+
+// The fake world: allowances drain and tasks finish. The real backend replaces this in slice 1.
+let last = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  tick((now - last) / 1000);
+  last = now;
+}, 250);
