@@ -32,13 +32,13 @@ The first office is one 16 x 14 room. Walking from the couch to the coffee machi
 2. **Grid A* with doors, not Recast**, to start. Employees reserve spots (as they already do at the coffee machine) to avoid each other. Move to Recast only if crowds jam.
 3. **Circle-versus-box collision** for walk mode, using the same wall data.
 4. **Two cameras behind one rig.** Isometric (orthographic, with pan, zoom and 90-degree rotation) and a perspective camera for follow, employee POV and boss walk. Transitions tween between them.
-5. **POV means both**: spectate any employee's eyes first (cheap, the camera rides on their head), then free walking as the boss with pointer lock. Yab can reorder these.
+5. **POV means both, employee first.** Yab chose employee eyes first (2026-11-15): the camera rides on the employee's head. Free walking as the boss with pointer lock comes after.
 6. **Performance rules:** instancing for repeated props, static meshes merged per chunk (about 8 units), one shadow light whose box follows the camera, name labels only when hovered or selected, a frame budget measured with 30 employees.
 7. **More employees are fake placeholders** (generated looks and names) until slice 1 supplies real ones.
 8. **img2threejs and the Mailroom** are a later stream: a pipeline for better props from reference images, and an "art department" employee that asks the laptop's Claude for them. The Mailroom is built but not deployed.
 
 ## Open questions (Yab)
 
-- Which POV first: employee eyes or walking as the boss?
+- ~~Which POV first?~~ Answered: employee eyes.
 - Rough preference for the building style: modern open office, or the cosy cluttered paper-company look?
 - Should visitors (customers) appear in the lobby, or employees only?
