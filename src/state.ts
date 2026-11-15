@@ -2,7 +2,18 @@
 
 export type Status = "working" | "idle" | "resting";
 
-export type Look = { shirt: string; hair: string; skin: string; accessory: "glasses" | "tie" | "none" };
+export type Look = {
+  shirt: string;
+  pants: string;
+  shoes: string;
+  hair: string;
+  skin: string;
+  hairStyle: "short" | "bob" | "bun" | "curly" | "bald";
+  /** Body scale: height and how broad. 1 is average. */
+  height: number;
+  build: number;
+  accessory: "glasses" | "tie" | "lanyard" | "cardigan" | "mustache" | "none";
+};
 
 export type Employee = {
   id: string;
@@ -24,7 +35,7 @@ export const employees: Employee[] = [
   {
     id: "gary",
     name: "Gary Pennyworth",
-    look: { shirt: "#e0556b", hair: "#5a3a22", skin: "#f2c48d", accessory: "tie" },
+    look: { shirt: "#e0556b", pants: "#2f3350", shoes: "#2a1a14", hair: "#5a3a22", skin: "#f2c48d", hairStyle: "short", height: 1.06, build: 1.12, accessory: "tie" },
     status: "idle",
     allowance: { used: 0, total: 20 },
     personality: "Loud, eager, sure everything is going great. Starts before reading the brief.",
@@ -34,12 +45,32 @@ export const employees: Employee[] = [
   {
     id: "nora",
     name: "Nora Quill",
-    look: { shirt: "#4aa3df", hair: "#1f1f2e", skin: "#d9a066", accessory: "glasses" },
+    look: { shirt: "#4aa3df", pants: "#262b3a", shoes: "#14161c", hair: "#1f1f2e", skin: "#d9a066", hairStyle: "bob", height: 0.97, build: 0.92, accessory: "glasses" },
     status: "idle",
     allowance: { used: 0, total: 20 },
     personality: "Dry, careful, checks twice. Says little and is usually right.",
     log: [{ at: "09:05", text: "Arrived. Reorganised the shared drive." }],
     memory: ["Cites sources.", "Gary will copy her work."],
+  },
+  {
+    id: "priya",
+    name: "Priya Raman",
+    look: { shirt: "#58b36c", pants: "#3a3347", shoes: "#e8e2d0", hair: "#2a1a14", skin: "#b9784a", hairStyle: "bun", height: 0.93, build: 0.98, accessory: "lanyard" },
+    status: "idle",
+    allowance: { used: 0, total: 20 },
+    personality: "Placeholder: cheerful, always organising something.",
+    log: [{ at: "09:10", text: "Arrived. Brought snacks." }],
+    memory: ["Knows where everything is."],
+  },
+  {
+    id: "walt",
+    name: "Walt Dunning",
+    look: { shirt: "#e8e2d0", pants: "#4a4a55", shoes: "#2a2a30", hair: "#999999", skin: "#e8b48a", hairStyle: "bald", height: 1.02, build: 1.22, accessory: "mustache" },
+    status: "idle",
+    allowance: { used: 0, total: 20 },
+    personality: "Placeholder: has seen it all, mentions it often.",
+    log: [{ at: "08:55", text: "Arrived first. Told a story about 1998." }],
+    memory: ["Prefers the old process."],
   },
 ];
 
