@@ -14,6 +14,7 @@ src/engine/
   loop.ts        fixed-step update plus variable-step render, pause, time scale
   events.ts      a tiny typed event bus (selected, mode changed, task given)
   assets.ts      asset registry and loader: models, clips, textures, by name, shared and cached
+  physics.ts     Rapier (WebAssembly): walls and furniture as static colliders, a character controller (built, tested)
   chunks.ts      the world split into chunks that load and unload (later: floors)
   systems/       behaviour (activities), movement (navigation), animation, camera, picking, ui-sync
   render/        the only code that touches three.js: scene sync, characters, props, lighting, culling
@@ -26,7 +27,7 @@ Rules: systems read and write the world state; **only `render/` creates or moves
 - **Floors:** the level format gets floors; each has its own nav grid; stairs and lifts are graph links; the renderer hides floors above the viewed one.
 - **Chunks:** the world is chunked; chunks stream by distance with their props, nav and people; far people stop animating.
 - **Editor:** Lite authors levels as data; the engine loads them.
-- **Physics:** a character controller (Rapier) behind a small interface, used by walk mode.
+- **Physics:** Rapier is the engine's physics (decided 2026-11-15). `src/engine/physics.ts` already turns the level into static colliders and moves a capsule through it, sliding along walls, stopping at furniture and passing through doors (4 tests). Next: wire it into walk mode (#2478), then doors, pushable objects, and people-to-people collisions to replace the hand-made separation.
 - **Renderer:** WebGPU (three's renderer or another) is swapped in behind `render/` without touching systems.
 
 ## First milestone
