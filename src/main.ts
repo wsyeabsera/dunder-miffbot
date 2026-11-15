@@ -60,6 +60,11 @@ if (import.meta.env.PROD) {
   };
 }
 
+// What the selected person is doing right now, under their status in the panel
+setInterval(() => {
+  if (panel.current) panel.setDoing(office.doing(panel.current));
+}, 400);
+
 // The fake world: allowances drain, tasks finish, and a fake manager keeps handing out work.
 let last = performance.now();
 setInterval(() => {

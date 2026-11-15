@@ -41,6 +41,8 @@ export type Office = {
   /** Everyone's place on the floor, plus the boss when walking, for the minimap. */
   positions(): { id: string; x: number; z: number; status: Status }[];
   boss(): { x: number; z: number; heading: number } | null;
+  /** One line about what someone is doing right now. */
+  doing(id: string): string;
   readonly level: Level;
   readonly mode: Mode;
 };
@@ -458,6 +460,10 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     setMode,
     level,
     focusPoint: (x, z) => rig.focus(x, z),
+    doing: (id) => {
+      const a = agents.find((x) => x.e.id === id);
+      return a ? describe(a) : "";
+    },
     focus(id) {
       const a = agents.find((x) => x.e.id === id);
       if (a) rig.focus(a.actor.group.position.x, a.actor.group.position.z);

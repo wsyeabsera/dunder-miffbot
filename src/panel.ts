@@ -13,6 +13,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 export function createPanel(root: HTMLElement, onClose: () => void) {
   let current: string | null = null;
   let refresh: (() => void) | null = null;
+  let doing: HTMLElement | null = null;
 
   function show(id: string | null) {
     current = id;
@@ -30,6 +31,7 @@ export function createPanel(root: HTMLElement, onClose: () => void) {
     close.onclick = onClose;
     const name = el("h2", undefined, e.name);
     const chip = el("span", "chip");
+    doing = el("p", "doing");
     const personality = el("p", "personality", e.personality);
 
     const meter = el("div", "meter");
@@ -66,7 +68,7 @@ export function createPanel(root: HTMLElement, onClose: () => void) {
     const memList = el("ul");
 
     root.append(
-      close, name, chip, personality,
+      close, name, chip, doing, personality,
       el("h3", undefined, "Allowance today"), meter, meterText,
       el("h3", undefined, "Current task"), task,
       form, error, dev,
@@ -79,7 +81,16 @@ export function createPanel(root: HTMLElement, onClose: () => void) {
   }
 
   subscribe(() => refresh?.());
-  return { show, get current() { return current; } };
+  return {
+    show,
+    get current() {
+      return current;
+    },
+    /** The live "doing now" line under the status. */
+    setDoing(text: string) {
+      if (doing && doing.textContent !== text) doing.textContent = text;
+    },
+  };
 }
 
 function draw(
