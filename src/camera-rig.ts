@@ -81,7 +81,7 @@ export class CameraRig {
     canvas.addEventListener("pointerup", (e) => {
       if (!dragged) {
         // In walk mode a click grabs the mouse; once grabbed, clicks are interactions (office.ts listens for those).
-        if (this.mode === "walk" && document.pointerLockElement !== canvas) canvas.requestPointerLock();
+        if (this.mode === "walk" && document.pointerLockElement !== canvas) this.lockMouse();
         else if (this.mode !== "walk") hooks.onTap(e);
       }
       down = null;
@@ -130,7 +130,7 @@ export class CameraRig {
         const sp = this.hooks.spawn;
         this.hooks.walker.place(sp.x, sp.z);
         this.walkLook = { yaw: Math.PI + sp.heading, pitch: 0 };
-        this.canvas.requestPointerLock();
+        this.lockMouse();
       } else if (document.pointerLockElement === this.canvas) {
         document.exitPointerLock();
       }
@@ -199,6 +199,16 @@ export class CameraRig {
     this.iso.position.set(this.target.x + Math.sin(this.yaw) * c, Math.sin(ELEVATION) * ISO_DISTANCE, this.target.z + Math.cos(this.yaw) * c);
     this.iso.lookAt(this.target.x, 0, this.target.z);
     this.applyIsoFrustum();
+  }
+
+  /** Grab the mouse for looking around. Browsers refuse without a recent click or key press; that is fine, a click will grab it. */
+  private lockMouse() {
+    try {
+      const attempt = this.canvas.requestPointerLock() as unknown;
+      if (attempt instanceof Promise) attempt.catch(() => {});
+    } catch {
+      /* not allowed right now */
+    }
   }
 
   /** Where the walking boss stands (feet), for the minimap. */

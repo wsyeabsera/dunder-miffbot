@@ -768,3 +768,44 @@ export function makeManagerDesk(): THREE.Group {
   g.scale.set(1.45, 1.1, 1.4);
   return g;
 }
+
+/** A speech bubble: a bold name and a smaller line under it, redrawn by `updateBubble` when the text changes. */
+export function makeBubble(): THREE.Sprite {
+  const c = document.createElement("canvas");
+  c.width = 768;
+  c.height = 224;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  sprite.scale.set(3.1, 0.9, 1);
+  sprite.renderOrder = 10;
+  sprite.userData.canvas = c;
+  return sprite;
+}
+
+export function updateBubble(sprite: THREE.Sprite, title: string, line: string) {
+  const c = sprite.userData.canvas as HTMLCanvasElement;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "rgba(14,19,32,0.88)";
+  ctx.strokeStyle = "rgba(122,162,255,0.9)";
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.roundRect(8, 8, c.width - 16, c.height - 40, 30);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(14,19,32,0.88)"; // the little tail
+  ctx.beginPath();
+  ctx.moveTo(c.width / 2 - 18, c.height - 32);
+  ctx.lineTo(c.width / 2, c.height - 6);
+  ctx.lineTo(c.width / 2 + 18, c.height - 32);
+  ctx.fill();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  fitFont(ctx, title, 64, c.width - 70);
+  ctx.fillText(title, c.width / 2, 78);
+  ctx.fillStyle = "#b8c2dc";
+  fitFont(ctx, line, 44, c.width - 70, "normal");
+  ctx.fillText(line, c.width / 2, 138);
+  (sprite.material.map as THREE.CanvasTexture).needsUpdate = true;
+}

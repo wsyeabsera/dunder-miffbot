@@ -40,9 +40,15 @@ createMinimap(document.querySelector<HTMLCanvasElement>("#minimap")!, office, pi
 function showMode(mode: Mode) {
   for (const b of buttons) b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
   stage.dataset.mode = mode;
+  document.body.dataset.mode = mode;
 }
 for (const b of buttons) b.onclick = () => office.setMode(b.dataset.mode as Mode);
 showMode("iso");
+
+// Using the task box needs the mouse: let go of the pointer lock from walk mode when it is focused
+document.querySelector("#panel")!.addEventListener("focusin", () => {
+  if (document.pointerLockElement) document.exitPointerLock();
+});
 
 // Sign out exists only where the Worker (and so a session) does; the local dev server has neither.
 if (import.meta.env.PROD) {

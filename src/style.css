@@ -73,3 +73,6 @@ kbd { margin-left: 6px; padding: 0 5px; border-radius: 4px; border: 1px solid va
 #minimap { position: absolute; left: 16px; bottom: 18px; width: 240px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 #stage[data-mode="pov"] #people, #stage[data-mode="walk"] #people, #stage[data-mode="follow"] #people { opacity: 0.35; }
 #stage[data-mode="walk"] .hint { opacity: 0.9; }
+
+/* Outside the overhead view the panel floats over the scene instead of squeezing it */
+body[data-mode="follow"] #panel, body[data-mode="pov"] #panel, body[data-mode="walk"] #panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 5; box-shadow: -10px 0 30px rgba(0,0,0,.4); }

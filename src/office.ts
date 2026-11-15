@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { employees, type Employee, type Status } from "./state.ts";
-import { makeLabel } from "./models.ts";
+import { makeBubble, makeLabel, updateBubble } from "./models.ts";
 import { createActor, lookToActor, type Actor, type Kit } from "./actors.ts";
 import { CameraRig, type Mode, type Subject } from "./camera-rig.ts";
 import { buildLevel, type Activity, type Level, type Spot } from "./world/level.ts";
@@ -42,6 +42,7 @@ type Agent = {
   zzz: THREE.Sprite;
   name: THREE.Sprite;
   clip: string;
+  bubble: string;
 };
 
 export type Office = {
@@ -155,9 +156,8 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     const seat = e.post === "reception" ? reception : spread(nextDesk++);
     const actor = createActor(kit, lookToActor(e.look, i));
     const g = actor.group;
-    const name = makeLabel(e.name);
-    name.position.set(0, 2.3, 0);
-    name.scale.set(2.2, 0.55, 1);
+    const name = makeBubble();
+    name.position.set(0, 2.45, 0);
     name.visible = false;
     g.add(name);
     const marker = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), new THREE.MeshBasicMaterial({ color: STATUS_COLOR[e.status], depthTest: false }));
@@ -181,7 +181,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     people.add(g);
     return {
       e, actor, seat, spot: seat, path: [], walking: false, stay: rand(1, 14), sit: 1, phase: i * 1.7, speed: rand(1.25, 1.75),
-      heading: seat.face, lift: SIT_LIFT.chair, variant: i, marker, zzz, name, clip: "",
+      heading: seat.face, lift: SIT_LIFT.chair, variant: i, marker, zzz, name, clip: "", bubble: "",
     } satisfies Agent;
   });
 
@@ -308,6 +308,16 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     return STAND[a.variant % STAND.length];
   }
 
+  const DOING: Record<string, string> = {
+    coffee: "Getting coffee", lunch: "Having lunch", print: "At the printer", restroom: "Back in a minute", couch: "Watching TV", terrace: "Getting some air", library: "Browsing books", wander: "Stretching legs", desk: "At the desk",
+  };
+  /** One line about what someone is doing, for their bubble. */
+  function describe(a: Agent): string {
+    if (a.e.status === "working") return a.e.task ?? "Working";
+    if (a.e.status === "resting") return "Resting until tomorrow";
+    return DOING[a.spot.activity] ?? "On a break";
+  }
+
   function pose(a: Agent, dt: number, hidden: boolean) {
     const g = a.actor.group;
     const seated = !a.walking && ["desk", "sit", "sitSoft"].includes(a.spot.pose);
@@ -426,6 +436,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     const dt = Math.min(clock.getDelta(), 0.1);
     const time = clock.elapsedTime;
     const focus = rig.mode === "iso" ? null : agents.find((a) => a.e.id === selected) ?? null;
+    const first = rig.mode === "walk" || rig.mode === "pov";
 
     for (const a of agents) {
       decide(a, dt);
@@ -433,7 +444,14 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       const inPov = rig.mode === "pov" && a === focus;
       pose(a, dt, inPov);
       a.marker.visible = rig.mode === "iso" || (rig.mode === "follow" && a === focus);
-      a.name.visible = !inPov && (a.e.id === selected || a.e.id === hovered);
+      a.name.visible = !inPov && (a.e.id === selected || a.e.id === hovered || (first && a.e.id === looked));
+      if (a.name.visible) {
+        const text = describe(a);
+        if (text !== a.bubble) {
+          a.bubble = text;
+          updateBubble(a.name, a.e.name, text);
+        }
+      }
     }
 
     if (focus) {
@@ -471,7 +489,6 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     for (const m of ledMaterials) m.emissiveIntensity = blink;
 
     // Crosshair and who is under it
-    const first = rig.mode === "walk" || rig.mode === "pov";
     if (crosshair) {
       crosshair.hidden = !first;
       looked = first ? lookAt() : null;
