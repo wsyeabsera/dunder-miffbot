@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Project
+.superpowers/
+.wrangler/
+.dev.vars
