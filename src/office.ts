@@ -91,7 +91,28 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   sun.shadow.normalBias = 0.04;
   sun.shadow.radius = 3;
   scene.add(sun);
+  scene.add(sun.target);
   scene.add(world.root);
+
+  /** The shadow light covers only what the camera sees, so zoomed-in views get sharper shadows from the same shadow map. */
+  const SUN_OFFSET = new THREE.Vector3(34, 46, 40);
+  let shadowHalf = 50;
+  function updateShadow(x: number, z: number, half: number) {
+    const texel = (2 * half) / 4096;
+    const sx = Math.round(x / (texel * 4)) * texel * 4; // snap to a few texels so shadows do not shimmer while panning
+    const sz = Math.round(z / (texel * 4)) * texel * 4;
+    sun.target.position.set(sx, 0, sz);
+    sun.position.set(sx + SUN_OFFSET.x, SUN_OFFSET.y, sz + SUN_OFFSET.z);
+    if (Math.abs(half - shadowHalf) > 0.5) {
+      shadowHalf = half;
+      const c = sun.shadow.camera;
+      c.left = -half;
+      c.right = half;
+      c.top = half;
+      c.bottom = -half;
+      c.updateProjectionMatrix();
+    }
+  }
 
   // ---- People
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: "#7aa2ff", side: THREE.DoubleSide }));
@@ -373,6 +394,8 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       subject.turn = 0;
     }
     rig.update(dt, focus ? subject : null);
+    const look = rig.shadowFocus(focus ? { x: subject.position.x, z: subject.position.z } : null);
+    updateShadow(look.x, look.z, look.half);
 
     // Walls: low in the overhead view so you can see into the rooms, full height from inside
     const overhead = rig.mode === "iso";

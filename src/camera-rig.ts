@@ -211,6 +211,16 @@ export class CameraRig {
     }
   }
 
+  /** Where the camera is looking on the floor, and how much of the floor the shadow light needs to cover. */
+  shadowFocus(subject: { x: number; z: number } | null): { x: number; z: number; half: number } {
+    if (this.mode === "iso") return { x: this.target.x, z: this.target.z, half: Math.min(50, Math.max(16, this.viewH * 1.1 + 6)) };
+    if (this.mode === "walk") {
+      const p = this.hooks.walker.position();
+      return { x: p.x, z: p.z, half: 24 };
+    }
+    return { x: subject?.x ?? 0, z: subject?.z ?? 0, half: 24 };
+  }
+
   /** True while the overhead view is zoomed out far enough to read room names without them covering the furniture. */
   get overview(): boolean {
     return this.mode === "iso" && this.viewH > 24;
