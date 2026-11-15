@@ -1,0 +1,1390 @@
+[
+ {
+  "id": "joint-body-71",
+  "kind": "group",
+  "name": "joint:body",
+  "pos": [
+   0,
+   0,
+   0
+  ],
+  "children": [
+   {
+    "id": "joint-legl-36",
+    "kind": "group",
+    "name": "joint:legL",
+    "pos": [
+     -0.16,
+     0.88,
+     0
+    ],
+    "children": [
+     {
+      "id": "thigh-pants-30",
+      "kind": "capsule",
+      "name": "thigh @pants",
+      "pos": [
+       0,
+       -0.4,
+       0
+      ],
+      "scale": [
+       1,
+       1,
+       0.95
+      ],
+      "size": [
+       0.115,
+       0.8
+      ],
+      "material": {
+       "color": "#2f3350",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "cuff-pants-31",
+      "kind": "cylinder",
+      "name": "cuff @pants",
+      "pos": [
+       0,
+       -0.7,
+       0
+      ],
+      "size": [
+       0.122,
+       0.05
+      ],
+      "material": {
+       "color": "#2f3350",
+       "roughness": 0.9
+      }
+     },
+     {
+      "id": "sole-32",
+      "kind": "box",
+      "name": "sole",
+      "pos": [
+       0,
+       -0.875,
+       0.06
+      ],
+      "size": [
+       0.27,
+       0.035,
+       0.46
+      ],
+      "material": {
+       "color": "#14161c",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "shoe-shoes-33",
+      "kind": "box",
+      "name": "shoe @shoes",
+      "pos": [
+       0,
+       -0.82,
+       0.03
+      ],
+      "size": [
+       0.25,
+       0.1,
+       0.34
+      ],
+      "material": {
+       "color": "#2a1a14",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "toe-shoes-34",
+      "kind": "sphere",
+      "name": "toe @shoes",
+      "pos": [
+       0,
+       -0.835,
+       0.2
+      ],
+      "scale": [
+       1,
+       0.62,
+       1.05
+      ],
+      "size": [
+       0.125
+      ],
+      "material": {
+       "color": "#2a1a14",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "heel-35",
+      "kind": "box",
+      "name": "heel",
+      "pos": [
+       0,
+       -0.835,
+       -0.1
+      ],
+      "size": [
+       0.22,
+       0.07,
+       0.1
+      ],
+      "material": {
+       "color": "#14161c",
+       "roughness": 0.8
+      }
+     }
+    ]
+   },
+   {
+    "id": "joint-legr-43",
+    "kind": "group",
+    "name": "joint:legR",
+    "pos": [
+     0.16,
+     0.88,
+     0
+    ],
+    "children": [
+     {
+      "id": "thigh-pants-37",
+      "kind": "capsule",
+      "name": "thigh @pants",
+      "pos": [
+       0,
+       -0.4,
+       0
+      ],
+      "scale": [
+       1,
+       1,
+       0.95
+      ],
+      "size": [
+       0.115,
+       0.8
+      ],
+      "material": {
+       "color": "#2f3350",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "cuff-pants-38",
+      "kind": "cylinder",
+      "name": "cuff @pants",
+      "pos": [
+       0,
+       -0.7,
+       0
+      ],
+      "size": [
+       0.122,
+       0.05
+      ],
+      "material": {
+       "color": "#2f3350",
+       "roughness": 0.9
+      }
+     },
+     {
+      "id": "sole-39",
+      "kind": "box",
+      "name": "sole",
+      "pos": [
+       0,
+       -0.875,
+       0.06
+      ],
+      "size": [
+       0.27,
+       0.035,
+       0.46
+      ],
+      "material": {
+       "color": "#14161c",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "shoe-shoes-40",
+      "kind": "box",
+      "name": "shoe @shoes",
+      "pos": [
+       0,
+       -0.82,
+       0.03
+      ],
+      "size": [
+       0.25,
+       0.1,
+       0.34
+      ],
+      "material": {
+       "color": "#2a1a14",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "toe-shoes-41",
+      "kind": "sphere",
+      "name": "toe @shoes",
+      "pos": [
+       0,
+       -0.835,
+       0.2
+      ],
+      "scale": [
+       1,
+       0.62,
+       1.05
+      ],
+      "size": [
+       0.125
+      ],
+      "material": {
+       "color": "#2a1a14",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "heel-42",
+      "kind": "box",
+      "name": "heel",
+      "pos": [
+       0,
+       -0.835,
+       -0.1
+      ],
+      "size": [
+       0.22,
+       0.07,
+       0.1
+      ],
+      "material": {
+       "color": "#14161c",
+       "roughness": 0.8
+      }
+     }
+    ]
+   },
+   {
+    "id": "hips-pants-44",
+    "kind": "sphere",
+    "name": "hips @pants",
+    "pos": [
+     0,
+     0.93,
+     0
+    ],
+    "scale": [
+     1,
+     0.62,
+     0.7
+    ],
+    "size": [
+     0.25
+    ],
+    "material": {
+     "color": "#2f3350",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "belt-45",
+    "kind": "cylinder",
+    "name": "belt",
+    "pos": [
+     0,
+     1,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     0.68
+    ],
+    "size": [
+     0.255,
+     0.045
+    ],
+    "material": {
+     "color": "#2a2230",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "buckle-46",
+    "kind": "box",
+    "name": "buckle",
+    "pos": [
+     0,
+     1,
+     0.175
+    ],
+    "size": [
+     0.06,
+     0.04,
+     0.012
+    ],
+    "material": {
+     "color": "#c9a14a",
+     "roughness": 0.35,
+     "metalness": 0.6
+    }
+   },
+   {
+    "id": "torso-shirt-47",
+    "kind": "capsule",
+    "name": "torso @shirt",
+    "pos": [
+     0,
+     1.3,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     0.66
+    ],
+    "size": [
+     0.275,
+     0.7
+    ],
+    "material": {
+     "color": "#4aa3df",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "waist-tuck-shirt-48",
+    "kind": "sphere",
+    "name": "waist tuck @shirt",
+    "pos": [
+     0,
+     1.09,
+     0
+    ],
+    "scale": [
+     1.05,
+     0.5,
+     0.7
+    ],
+    "size": [
+     0.24
+    ],
+    "material": {
+     "color": "#4aa3df",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "collar-l-49",
+    "kind": "box",
+    "name": "collar L",
+    "pos": [
+     -0.07,
+     1.585,
+     0.115
+    ],
+    "rot": [
+     0,
+     0,
+     28
+    ],
+    "size": [
+     0.13,
+     0.04,
+     0.05
+    ],
+    "material": {
+     "color": "#f4f4f6",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "collar-r-50",
+    "kind": "box",
+    "name": "collar R",
+    "pos": [
+     0.07,
+     1.585,
+     0.115
+    ],
+    "rot": [
+     0,
+     0,
+     -28
+    ],
+    "size": [
+     0.13,
+     0.04,
+     0.05
+    ],
+    "material": {
+     "color": "#f4f4f6",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "button--27",
+    "kind": "sphere",
+    "name": "button 0",
+    "pos": [
+     0,
+     1.42,
+     0.2
+    ],
+    "size": [
+     0.018
+    ],
+    "material": {
+     "color": "#f4f4f6",
+     "roughness": 0.3
+    }
+   },
+   {
+    "id": "button--28",
+    "kind": "sphere",
+    "name": "button 1",
+    "pos": [
+     0,
+     1.2799999999999998,
+     0.2
+    ],
+    "size": [
+     0.018
+    ],
+    "material": {
+     "color": "#f4f4f6",
+     "roughness": 0.3
+    }
+   },
+   {
+    "id": "button--29",
+    "kind": "sphere",
+    "name": "button 2",
+    "pos": [
+     0,
+     1.14,
+     0.2
+    ],
+    "size": [
+     0.018
+    ],
+    "material": {
+     "color": "#f4f4f6",
+     "roughness": 0.3
+    }
+   },
+   {
+    "id": "pocket-shirt-51",
+    "kind": "box",
+    "name": "pocket @shirt",
+    "pos": [
+     0.15,
+     1.38,
+     0.2
+    ],
+    "size": [
+     0.12,
+     0.12,
+     0.012
+    ],
+    "material": {
+     "color": "#4aa3df",
+     "roughness": 0.95
+    }
+   },
+   {
+    "id": "shoulder-l-shirt-52",
+    "kind": "sphere",
+    "name": "shoulder L @shirt",
+    "pos": [
+     -0.37,
+     1.52,
+     0
+    ],
+    "size": [
+     0.1
+    ],
+    "material": {
+     "color": "#4aa3df",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "shoulder-r-shirt-53",
+    "kind": "sphere",
+    "name": "shoulder R @shirt",
+    "pos": [
+     0.37,
+     1.52,
+     0
+    ],
+    "size": [
+     0.1
+    ],
+    "material": {
+     "color": "#4aa3df",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "neck-skin-54",
+    "kind": "cylinder",
+    "name": "neck @skin",
+    "pos": [
+     0,
+     1.62,
+     0
+    ],
+    "size": [
+     0.085,
+     0.14
+    ],
+    "material": {
+     "color": "#f2c48d",
+     "roughness": 0.8
+    }
+   },
+   {
+    "id": "joint-arml-62",
+    "kind": "group",
+    "name": "joint:armL",
+    "pos": [
+     -0.42,
+     1.52,
+     0
+    ],
+    "children": [
+     {
+      "id": "sleeve-shirt-55",
+      "kind": "capsule",
+      "name": "sleeve @shirt",
+      "pos": [
+       0,
+       -0.22,
+       0
+      ],
+      "size": [
+       0.088,
+       0.5
+      ],
+      "material": {
+       "color": "#4aa3df",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "sleeve-hem-shirt-56",
+      "kind": "cylinder",
+      "name": "sleeve hem @shirt",
+      "pos": [
+       0,
+       -0.43,
+       0
+      ],
+      "size": [
+       0.095,
+       0.05
+      ],
+      "material": {
+       "color": "#4aa3df",
+       "roughness": 0.9
+      }
+     },
+     {
+      "id": "joint-forearml-61",
+      "kind": "group",
+      "name": "joint:forearmL",
+      "pos": [
+       0,
+       -0.44,
+       0
+      ],
+      "children": [
+       {
+        "id": "forearm-skin-57",
+        "kind": "capsule",
+        "name": "forearm @skin",
+        "pos": [
+         0,
+         -0.17,
+         0
+        ],
+        "size": [
+         0.068,
+         0.38
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       },
+       {
+        "id": "palm-skin-58",
+        "kind": "sphere",
+        "name": "palm @skin",
+        "pos": [
+         0,
+         -0.36,
+         0.012
+        ],
+        "scale": [
+         1,
+         1.15,
+         0.72
+        ],
+        "size": [
+         0.078
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       },
+       {
+        "id": "thumb-skin-59",
+        "kind": "sphere",
+        "name": "thumb @skin",
+        "pos": [
+         0.058,
+         -0.335,
+         0.045
+        ],
+        "rot": [
+         20,
+         0,
+         -20
+        ],
+        "scale": [
+         0.8,
+         1.6,
+         0.8
+        ],
+        "size": [
+         0.026
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       },
+       {
+        "id": "fingers-skin-60",
+        "kind": "capsule",
+        "name": "fingers @skin",
+        "pos": [
+         0,
+         -0.43,
+         0.012
+        ],
+        "scale": [
+         1.5,
+         1,
+         0.8
+        ],
+        "size": [
+         0.045,
+         0.1
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "joint-armr-70",
+    "kind": "group",
+    "name": "joint:armR",
+    "pos": [
+     0.42,
+     1.52,
+     0
+    ],
+    "children": [
+     {
+      "id": "sleeve-shirt-63",
+      "kind": "capsule",
+      "name": "sleeve @shirt",
+      "pos": [
+       0,
+       -0.22,
+       0
+      ],
+      "size": [
+       0.088,
+       0.5
+      ],
+      "material": {
+       "color": "#4aa3df",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "sleeve-hem-shirt-64",
+      "kind": "cylinder",
+      "name": "sleeve hem @shirt",
+      "pos": [
+       0,
+       -0.43,
+       0
+      ],
+      "size": [
+       0.095,
+       0.05
+      ],
+      "material": {
+       "color": "#4aa3df",
+       "roughness": 0.9
+      }
+     },
+     {
+      "id": "joint-forearmr-69",
+      "kind": "group",
+      "name": "joint:forearmR",
+      "pos": [
+       0,
+       -0.44,
+       0
+      ],
+      "children": [
+       {
+        "id": "forearm-skin-65",
+        "kind": "capsule",
+        "name": "forearm @skin",
+        "pos": [
+         0,
+         -0.17,
+         0
+        ],
+        "size": [
+         0.068,
+         0.38
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       },
+       {
+        "id": "palm-skin-66",
+        "kind": "sphere",
+        "name": "palm @skin",
+        "pos": [
+         0,
+         -0.36,
+         0.012
+        ],
+        "scale": [
+         1,
+         1.15,
+         0.72
+        ],
+        "size": [
+         0.078
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       },
+       {
+        "id": "thumb-skin-67",
+        "kind": "sphere",
+        "name": "thumb @skin",
+        "pos": [
+         -0.058,
+         -0.335,
+         0.045
+        ],
+        "rot": [
+         20,
+         0,
+         20
+        ],
+        "scale": [
+         0.8,
+         1.6,
+         0.8
+        ],
+        "size": [
+         0.026
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       },
+       {
+        "id": "fingers-skin-68",
+        "kind": "capsule",
+        "name": "fingers @skin",
+        "pos": [
+         0,
+         -0.43,
+         0.012
+        ],
+        "scale": [
+         1.5,
+         1,
+         0.8
+        ],
+        "size": [
+         0.045,
+         0.1
+        ],
+        "material": {
+         "color": "#f2c48d",
+         "roughness": 0.8
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "joint-head-26",
+    "kind": "group",
+    "name": "joint:head",
+    "pos": [
+     0,
+     1.66,
+     0
+    ],
+    "children": [
+     {
+      "id": "skull-skin-1",
+      "kind": "sphere",
+      "name": "skull @skin",
+      "pos": [
+       0,
+       0.22,
+       0
+      ],
+      "scale": [
+       1,
+       1.07,
+       0.96
+      ],
+      "size": [
+       0.27
+      ],
+      "material": {
+       "color": "#f2c48d",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "jaw-skin-2",
+      "kind": "sphere",
+      "name": "jaw @skin",
+      "pos": [
+       0,
+       0.1,
+       0.02
+      ],
+      "scale": [
+       1.05,
+       0.8,
+       0.95
+      ],
+      "size": [
+       0.2
+      ],
+      "material": {
+       "color": "#f2c48d",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "ear-l-skin-3",
+      "kind": "sphere",
+      "name": "ear L @skin",
+      "pos": [
+       -0.265,
+       0.2,
+       0
+      ],
+      "scale": [
+       0.6,
+       1,
+       1
+      ],
+      "size": [
+       0.055
+      ],
+      "material": {
+       "color": "#f2c48d",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "ear-r-skin-4",
+      "kind": "sphere",
+      "name": "ear R @skin",
+      "pos": [
+       0.265,
+       0.2,
+       0
+      ],
+      "scale": [
+       0.6,
+       1,
+       1
+      ],
+      "size": [
+       0.055
+      ],
+      "material": {
+       "color": "#f2c48d",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "nose-skin-5",
+      "kind": "sphere",
+      "name": "nose @skin",
+      "pos": [
+       0,
+       0.18,
+       0.268
+      ],
+      "scale": [
+       1,
+       1.1,
+       1.2
+      ],
+      "size": [
+       0.04
+      ],
+      "material": {
+       "color": "#f2c48d",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "cheek-l-6",
+      "kind": "sphere",
+      "name": "cheek L",
+      "pos": [
+       -0.15,
+       0.14,
+       0.225
+      ],
+      "scale": [
+       1,
+       0.7,
+       0.4
+      ],
+      "size": [
+       0.04
+      ],
+      "material": {
+       "color": "#e8907a",
+       "roughness": 0.5,
+       "opacity": 0.55
+      }
+     },
+     {
+      "id": "cheek-r-7",
+      "kind": "sphere",
+      "name": "cheek R",
+      "pos": [
+       0.15,
+       0.14,
+       0.225
+      ],
+      "scale": [
+       1,
+       0.7,
+       0.4
+      ],
+      "size": [
+       0.04
+      ],
+      "material": {
+       "color": "#e8907a",
+       "roughness": 0.5,
+       "opacity": 0.55
+      }
+     },
+     {
+      "id": "eyel-11",
+      "kind": "group",
+      "name": "eyeL",
+      "pos": [
+       -0.1,
+       0.26,
+       0.23
+      ],
+      "children": [
+       {
+        "id": "eye-white-l-8",
+        "kind": "sphere",
+        "name": "eye white L",
+        "pos": [
+         0,
+         0,
+         0
+        ],
+        "scale": [
+         1,
+         1.1,
+         0.5
+        ],
+        "size": [
+         0.052
+        ],
+        "material": {
+         "color": "#f4f4f6",
+         "roughness": 0.3
+        }
+       },
+       {
+        "id": "pupil-l-9",
+        "kind": "sphere",
+        "name": "pupil L",
+        "pos": [
+         0,
+         0,
+         0.026
+        ],
+        "scale": [
+         1,
+         1,
+         0.5
+        ],
+        "size": [
+         0.028
+        ],
+        "material": {
+         "color": "#1a1a22",
+         "roughness": 0.2
+        }
+       },
+       {
+        "id": "glint-l-10",
+        "kind": "sphere",
+        "name": "glint L",
+        "pos": [
+         0.01,
+         0.014,
+         0.036
+        ],
+        "size": [
+         0.008
+        ],
+        "material": {
+         "color": "#ffffff",
+         "roughness": 0.8,
+         "emissive": "#ffffff"
+        }
+       }
+      ]
+     },
+     {
+      "id": "eyer-15",
+      "kind": "group",
+      "name": "eyeR",
+      "pos": [
+       0.1,
+       0.26,
+       0.23
+      ],
+      "children": [
+       {
+        "id": "eye-white-r-12",
+        "kind": "sphere",
+        "name": "eye white R",
+        "pos": [
+         0,
+         0,
+         0
+        ],
+        "scale": [
+         1,
+         1.1,
+         0.5
+        ],
+        "size": [
+         0.052
+        ],
+        "material": {
+         "color": "#f4f4f6",
+         "roughness": 0.3
+        }
+       },
+       {
+        "id": "pupil-r-13",
+        "kind": "sphere",
+        "name": "pupil R",
+        "pos": [
+         0,
+         0,
+         0.026
+        ],
+        "scale": [
+         1,
+         1,
+         0.5
+        ],
+        "size": [
+         0.028
+        ],
+        "material": {
+         "color": "#1a1a22",
+         "roughness": 0.2
+        }
+       },
+       {
+        "id": "glint-r-14",
+        "kind": "sphere",
+        "name": "glint R",
+        "pos": [
+         0.01,
+         0.014,
+         0.036
+        ],
+        "size": [
+         0.008
+        ],
+        "material": {
+         "color": "#ffffff",
+         "roughness": 0.8,
+         "emissive": "#ffffff"
+        }
+       }
+      ]
+     },
+     {
+      "id": "brow-l-hair-16",
+      "kind": "box",
+      "name": "brow L @hair",
+      "pos": [
+       -0.1,
+       0.345,
+       0.235
+      ],
+      "rot": [
+       0,
+       0,
+       7
+      ],
+      "size": [
+       0.1,
+       0.022,
+       0.03
+      ],
+      "material": {
+       "color": "#5a3a22",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "brow-r-hair-17",
+      "kind": "box",
+      "name": "brow R @hair",
+      "pos": [
+       0.1,
+       0.345,
+       0.235
+      ],
+      "rot": [
+       0,
+       0,
+       -7
+      ],
+      "size": [
+       0.1,
+       0.022,
+       0.03
+      ],
+      "material": {
+       "color": "#5a3a22",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "mouth-18",
+      "kind": "box",
+      "name": "mouth",
+      "pos": [
+       0,
+       0.095,
+       0.25
+      ],
+      "size": [
+       0.085,
+       0.016,
+       0.03
+      ],
+      "material": {
+       "color": "#a8484e",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "smile-l-19",
+      "kind": "sphere",
+      "name": "smile L",
+      "pos": [
+       -0.05,
+       0.105,
+       0.25
+      ],
+      "size": [
+       0.012
+      ],
+      "material": {
+       "color": "#a8484e",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "smile-r-20",
+      "kind": "sphere",
+      "name": "smile R",
+      "pos": [
+       0.05,
+       0.105,
+       0.25
+      ],
+      "size": [
+       0.012
+      ],
+      "material": {
+       "color": "#a8484e",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "hair-top-hair-21",
+      "kind": "sphere",
+      "name": "hair top @hair",
+      "pos": [
+       0,
+       0.4,
+       -0.05
+      ],
+      "scale": [
+       1,
+       0.56,
+       1.04
+      ],
+      "size": [
+       0.305
+      ],
+      "material": {
+       "color": "#5a3a22",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "hair-back-hair-22",
+      "kind": "sphere",
+      "name": "hair back @hair",
+      "pos": [
+       0,
+       0.27,
+       -0.1
+      ],
+      "scale": [
+       1,
+       0.95,
+       0.85
+      ],
+      "size": [
+       0.265
+      ],
+      "material": {
+       "color": "#5a3a22",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "hair-fringe-hair-23",
+      "kind": "sphere",
+      "name": "hair fringe @hair",
+      "pos": [
+       0,
+       0.455,
+       0.15
+      ],
+      "rot": [
+       -12,
+       0,
+       0
+      ],
+      "scale": [
+       2.2,
+       0.45,
+       0.8
+      ],
+      "size": [
+       0.1
+      ],
+      "material": {
+       "color": "#5a3a22",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "sideburn-l-hair-24",
+      "kind": "sphere",
+      "name": "sideburn L @hair",
+      "pos": [
+       -0.255,
+       0.22,
+       0.02
+      ],
+      "scale": [
+       0.6,
+       1.5,
+       1.1
+      ],
+      "size": [
+       0.06
+      ],
+      "material": {
+       "color": "#5a3a22",
+       "roughness": 0.8
+      }
+     },
+     {
+      "id": "sideburn-r-hair-25",
+      "kind": "sphere",
+      "name": "sideburn R @hair",
+      "pos": [
+       0.255,
+       0.22,
+       0.02
+      ],
+      "scale": [
+       0.6,
+       1.5,
+       1.1
+      ],
+      "size": [
+       0.06
+      ],
+      "material": {
+       "color": "#5a3a22",
+       "roughness": 0.8
+      }
+     }
+    ]
+   }
+  ]
+ }
+]

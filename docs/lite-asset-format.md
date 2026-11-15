@@ -30,6 +30,14 @@ One scene per prop (or per kit, with each prop a top-level group named for what 
 3. Load it: `buildLiteModel(json.objects, { shirt, pants, shoes, hair, skin })` returns `{ group, joints }`.
 4. Compare it next to the old version in `/people.html` before switching the app over.
 
+## Scripts in this repo
+
+- `scripts/lite/character.mjs`: the base character, written as a Lite scene (the design lives here and is easy to iterate).
+- `node scripts/lite/push-character.mjs`: creates the Lite project `dunder-miffbot` if needed and sends the scene to Lite, then prints Lite's validation and review. Needs `LITE_TOKEN` in the environment and the Lite dev server on port 8790.
+- `node scripts/lite/pull.mjs [scene]`: saves a scene's objects as `src/assets/<scene>.lite.json` (what the app loads).
+- `/people.html` (in `npm run dev`): the dev sheet. `?row=lite` shows the Lite design, `?row=code` the code-built people, `?yaw=0.5` turns them.
+- To look at a scene in Lite's own Orbit viewer, sign in to Lite at `http://127.0.0.1:8790` and open `#/project/dunder-miffbot/scene/character-base`.
+
 ## Known gaps in Lite (tasks filed)
 
 - No partial sphere (a dome), so hair caps are approximated with squashed spheres until Lite gets one.
