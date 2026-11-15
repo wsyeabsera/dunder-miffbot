@@ -1,44 +1,25 @@
 import * as THREE from "three";
-import { employees, type Employee, type Status } from "./state.ts";
+import { employees, type Status } from "./state.ts";
 import { makeBubble, makeLabel, updateBubble } from "./models.ts";
 import { createActor, lookToActor, type Actor, type Kit } from "./actors.ts";
 import { CameraRig, type Mode, type Subject } from "./camera-rig.ts";
-import { buildLevel, type Activity, type Level, type Spot } from "./world/level.ts";
+import { buildLevel, type Level } from "./world/level.ts";
 import { buildWorld } from "./world/build.ts";
-import type { Pt } from "./world/grid.ts";
+import { assignSeats, createWorld, spawn, type Entity } from "./engine/world.ts";
+import { decide } from "./engine/behavior.ts";
+import { move } from "./engine/movement.ts";
 import type { Walker } from "./engine/physics.ts";
 
 const STATUS_COLOR: Record<Status, string> = { working: "#4ade80", idle: "#facc15", resting: "#94a3b8" };
-/** Chance weights and how long (seconds) someone stays, per break activity. */
-const BREAKS: { activity: Activity; weight: number; stay: [number, number] }[] = [
-  { activity: "coffee", weight: 3, stay: [6, 10] },
-  { activity: "lunch", weight: 2, stay: [12, 20] },
-  { activity: "print", weight: 2, stay: [5, 8] },
-  { activity: "restroom", weight: 1.5, stay: [5, 8] },
-  { activity: "couch", weight: 2, stay: [12, 24] },
-  { activity: "terrace", weight: 1.5, stay: [10, 20] },
-  { activity: "library", weight: 1, stay: [6, 12] },
-  { activity: "wander", weight: 1, stay: [4, 8] },
-  { activity: "chat", weight: 2.5, stay: [9, 15] },
-];
 /** How far to raise a seated person so they sit on the seat: the sitting clip is made for a low seat. Tuned by eye. */
 const SIT_LIFT = { chair: 0.2, soft: 0.0 };
 const WALL_LOW = 0.38;
 
-type Agent = {
-  e: Employee;
+/** A person: the simulated entity (src/engine/world.ts) plus everything needed to draw them. */
+type Agent = Entity & {
   actor: Actor;
-  seat: Spot;
-  spot: Spot; // where they are, or are heading
-  path: Pt[];
-  walking: boolean;
-  stay: number;
   sit: number; // 0 standing .. 1 seated
-  phase: number;
-  speed: number;
-  heading: number;
   lift: number; // current height offset from sitting
-  variant: number; // picks between similar clips so neighbours do not move in sync
   marker: THREE.Mesh;
   zzz: THREE.Sprite;
   name: THREE.Sprite;
@@ -61,8 +42,6 @@ export type Office = {
 };
 
 type Hooks = { onSelect(id: string | null): void; onMode(mode: Mode): void; fade?: HTMLElement };
-
-const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 /** Where the boss appears in walk mode: inside the manager's office, facing the door. */
 const BOSS = { x: 9, z: -12, heading: 0 };
@@ -106,11 +85,6 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   scene.add(world.root);
 
   // ---- People
-  const reception = level.seats.find((s) => s.reception)!;
-  const desks = level.seats.filter((s) => !s.reception);
-  const spread = (i: number) => desks[(i * 11) % desks.length]; // spread the first employees across the floor
-  let nextDesk = 0;
-
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: "#7aa2ff", side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.04;
@@ -153,8 +127,10 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
   people.name = "people";
   scene.add(people);
 
-  const agents: Agent[] = employees.slice(0, level.seats.length).map((e, i) => {
-    const seat = e.post === "reception" ? reception : spread(nextDesk++);
+  const crew = employees.slice(0, level.seats.length);
+  const seats = assignSeats(level, crew);
+  const agents: Agent[] = crew.map((e, i) => {
+    const seat = seats[i];
     const actor = createActor(kit, lookToActor(e.look, i));
     const g = actor.group;
     const name = makeBubble();
@@ -180,125 +156,21 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     g.rotation.y = seat.face;
     g.name = e.name;
     people.add(g);
-    return {
-      e, actor, seat, spot: seat, path: [], walking: false, stay: rand(1, 14), sit: 1, phase: i * 1.7, speed: rand(1.25, 1.75),
-      heading: seat.face, lift: SIT_LIFT.chair, variant: i, marker, zzz, name, clip: "", bubble: "",
-    } satisfies Agent;
+    return { ...spawn(e, seat, i, Math.random), actor, sit: 1, lift: SIT_LIFT.chair, marker, zzz, name, clip: "", bubble: "" } satisfies Agent;
   });
 
-  // ---- Reservations: one person per spot. Desks belong to their owner.
-  const holder = new Map<string, Agent>();
-  for (const a of agents) holder.set(a.seat.id, a);
-
-  const route = (a: Agent, to: Spot): Pt[] => {
-    const pos = a.actor.group.position;
-    const pts: Pt[] = [];
-    let start: Pt = { x: pos.x, z: pos.z };
-    if (!a.walking && Math.hypot(pos.x - a.spot.x, pos.z - a.spot.z) < 0.3) {
-      pts.push(a.spot.approach); // step out of the chair first
-      start = a.spot.approach;
-    }
-    const mid = level.grid.path(start, to.approach);
-    if (mid) pts.push(...mid);
-    else pts.push(to.approach);
-    if (to.approach.x !== to.x || to.approach.z !== to.z) pts.push({ x: to.x, z: to.z });
-    return pts;
-  };
-
-  function goTo(a: Agent, to: Spot) {
-    if (holder.get(a.spot.id) === a && a.spot !== a.seat) holder.delete(a.spot.id);
-    holder.set(to.id, a);
-    a.path = route(a, to);
-    a.spot = to;
-    a.walking = a.path.length > 0;
-  }
-
-  function pickBreak(a: Agent) {
-    const options = BREAKS.map((b) => ({ ...b, free: level.spots.filter((s) => s.activity === b.activity && !holder.has(s.id)) })).filter((b) => b.free.length);
-    const total = options.reduce((t, o) => t + o.weight, 0);
-    let r = Math.random() * total;
-    for (const o of options) {
-      if ((r -= o.weight) <= 0) {
-        const spot = o.free[Math.floor(Math.random() * o.free.length)];
-        goTo(a, spot);
-        a.stay = rand(o.stay[0], o.stay[1]);
-        // A chat needs two: call over someone on a break to stand opposite
-        const partner = spot.partner ? level.spots.find((s) => s.id === spot.partner) : undefined;
-        if (partner && !holder.has(partner.id)) {
-          const mate = agents.find((b) => b !== a && b.e.status === "idle" && !b.walking && b.stay > 0 && !b.spot.partner);
-          if (mate) {
-            goTo(mate, partner);
-            mate.stay = a.stay;
-          }
-        }
-        return;
-      }
-    }
-  }
-
-  function decide(a: Agent, dt: number) {
-    if (a.walking) return;
-    if (a.e.status !== "idle") {
-      if (a.spot !== a.seat) goTo(a, a.seat);
-      return;
-    }
-    a.stay -= dt;
-    if (a.stay > 0) return;
-    // Back to the desk now and then, otherwise somewhere else
-    if (a.spot !== a.seat && Math.random() < 0.3) {
-      goTo(a, a.seat);
-      a.stay = rand(6, 14);
-    } else {
-      pickBreak(a);
-      if (!a.walking) a.stay = rand(3, 6);
-    }
-  }
+  // ---- The simulation: behaviour and movement are pure systems in src/engine; this file only draws the result.
+  const sim = createWorld(level, agents);
 
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   const approach = (cur: number, target: number, k: number) => cur + (target - cur) * clamp01(k);
   const soft = (a: Agent) => a.spot.pose === "sitSoft";
 
-  function move(a: Agent, dt: number) {
+  /** Put the 3D body where the simulation says the person is, turning smoothly. */
+  function syncBody(a: Agent, dt: number) {
     const g = a.actor.group;
-    if (a.walking) {
-      const next = a.path[0];
-      const dx = next.x - g.position.x;
-      const dz = next.z - g.position.z;
-      const dist = Math.hypot(dx, dz);
-      const step = a.speed * dt;
-      if (dist <= step) {
-        g.position.x = next.x;
-        g.position.z = next.z;
-        a.path.shift();
-        if (!a.path.length) {
-          a.walking = false;
-          a.heading = a.spot.face;
-        }
-      } else {
-        let mx = (dx / dist) * step;
-        let mz = (dz / dist) * step;
-        // Keep a little distance from people who are standing or walking nearby
-        for (const o of agents) {
-          if (o === a || o.sit > 0.5) continue;
-          const ox = g.position.x - o.actor.group.position.x;
-          const oz = g.position.z - o.actor.group.position.z;
-          const d = Math.hypot(ox, oz);
-          if (d < 0.7 && d > 0.001) {
-            mx += (ox / d) * (0.7 - d) * dt * 2;
-            mz += (oz / d) * (0.7 - d) * dt * 2;
-          }
-        }
-        if (!level.walls.solidAt(g.position.x + mx, g.position.z + mz)) {
-          g.position.x += mx;
-          g.position.z += mz;
-        } else {
-          g.position.x += (dx / dist) * step;
-          g.position.z += (dz / dist) * step;
-        }
-        a.heading = Math.atan2(dx, dz);
-        a.phase += dt * a.speed * 5.5;
-      }
-    }
+    g.position.x = a.x;
+    g.position.z = a.z;
     let dh = a.heading - g.rotation.y;
     dh = Math.atan2(Math.sin(dh), Math.cos(dh));
     g.rotation.y += dh * clamp01(dt * 10);
@@ -391,7 +263,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
       const id = hit.object.userData.employeeId as string | undefined;
       if (id) return id;
       const seatId = hit.object.userData.seatId as string | undefined;
-      if (seatId) return holder.get(seatId)?.e.id ?? null;
+      if (seatId) return sim.holder.get(seatId)?.e.id ?? null;
     }
     return null;
   }
@@ -458,8 +330,9 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
     const first = rig.mode === "walk" || rig.mode === "pov";
 
     for (const a of agents) {
-      decide(a, dt);
-      move(a, dt);
+      decide(sim, a, dt);
+      move(sim, a, dt);
+      syncBody(a, dt);
       const inPov = rig.mode === "pov" && a === focus;
       pose(a, dt, inPov);
       a.marker.visible = rig.mode === "iso" || (rig.mode === "follow" && a === focus);
@@ -498,7 +371,7 @@ export async function createOffice(canvas: HTMLCanvasElement, container: HTMLEle
 
     // Monitors glow with their owner's work
     for (const seat of level.seats) {
-      const owner = holder.get(seat.id);
+      const owner = sim.holder.get(seat.id);
       const here = owner && owner.spot === seat && !owner.walking;
       const target = here ? (owner.e.status === "working" ? 0.9 + Math.sin(time * 9 + owner.phase) * 0.12 : owner.e.status === "idle" ? 0.35 : 0.08) : 0.18;
       const m = world.screens.get(seat.id);
